@@ -1,0 +1,1206 @@
+\documentclass[10pt,a4paper]{article}
+
+% ==================================================
+% FTP_DeLearn – Deep Learning Practice Exam Questions
+% Companion to FTP_DeLearn_Summary
+% Team: Tobias, Almira, Isha
+% ==================================================
+
+\usepackage[margin=1.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{graphicx}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tcolorbox}
+\usepackage{multicol}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{parskip}
+\usepackage{microtype}
+\usepackage[T1]{fontenc}
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}}{} % use Latin Modern if available
+
+\setcounter{tocdepth}{2}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=MidnightBlue,
+    urlcolor=MidnightBlue
+}
+
+% ---------- Custom Boxes ----------
+
+\newtcolorbox{definitionbox}{
+    colback=blue!5,
+    colframe=blue!60!black,
+    title=Definition
+}
+
+\newtcolorbox{formulabox}{
+    colback=green!5,
+    colframe=green!50!black,
+    title=Key Formula
+}
+
+\newtcolorbox{examtipbox}{
+    colback=yellow!10,
+    colframe=orange!70!black,
+    title=Common Mistake
+}
+
+\newtcolorbox{importantbox}{
+    colback=red!5,
+    colframe=red!60!black,
+    title=Important
+}
+
+\newtcolorbox{answerbox}{
+    colback=teal!5,
+    colframe=teal!55!black,
+    title=Model Answer
+}
+
+% ---------- Question helper ----------
+% Use inside an enumerate: \q{question text}
+\newcommand{\q}[1]{\item #1}
+
+% ---------- Metadata ----------
+
+\title{\textbf{FTP\_DeLearn}\\Deep Learning -- Practice Exam Questions}
+\author{Tobias \and Almira \and Isha}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{importantbox}
+This document has two chapters. \textbf{Chapter 1 -- Typical Exam Questions} reworks the official sample-question deck (paraphrased) with concise model answers and worked numerical solutions. \textbf{Chapter 2 -- Additional Questions} is our own topic-by-topic practice set. \textbf{Cover the teal answer boxes to self-test.}
+\end{importantbox}
+
+\tableofcontents
+\newpage
+
+% ##################################################
+\section{Typical Exam Questions}
+% ##################################################
+
+\begin{importantbox}
+\textbf{Format:} 120-minute Moodle quiz; a 2-page handwritten (or printed) summary is allowed. \textbf{Question types:} (i) theory/concept (definitions, intuition), (ii) numerical exercises (gradients, activation maps, parameter counts), (iii) code reading / fill-the-gap, (iv) open use-case design. The questions below mirror the official sample deck.
+\end{importantbox}
+
+% --------------------------------------------------
+\subsection{Learning Curves}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q How do the error-vs-epoch curves change for a \emph{smaller} vs \emph{larger} learning rate, and for a \emph{small} vs \emph{large} batch size?
+\begin{answerbox}
+\textbf{Learning rate:} smaller $\eta$ gives a slower, smoother, monotone decrease that may not reach as low within the same epochs; larger $\eta$ drops faster initially but is noisier and can plateau higher or oscillate/diverge if too large.\\
+\textbf{Batch size:} small batches give a noisier curve (high-variance gradient estimate), often faster per-epoch progress and a regularising effect; large batches give a smoother, more stable curve, slower per-epoch progress, and can converge to sharper minima that generalise slightly worse.
+\end{answerbox}
+
+\q Sketch train and test error for \emph{low} vs \emph{high} model complexity. What changes with badly initialised weights?
+\begin{answerbox}
+Low complexity: train and test error both stay high and close together (underfitting / high bias). High complexity: train error falls near zero while test error is higher and may rise late (overfitting / high variance $\Rightarrow$ a gap). Bad initialisation: training starts slowly or stalls (flat curve early due to vanishing/exploding signals), and may fail to converge.
+\end{answerbox}
+
+\q For a classification task, contrast the curves with cross-entropy vs MSE cost.
+\begin{answerbox}
+With cross-entropy the error drops faster and reaches a lower value. With MSE on a sigmoid/softmax output the gradient becomes tiny when a prediction is confidently wrong (saturation), so learning is slow and can stall at a higher error. CE's gradient ($\hat y - y$) does not vanish in that regime.
+\end{answerbox}
+
+\q On the bias--variance plot, identify training error, test error, bias, variance, generalisation error, and how to reduce each.
+\begin{answerbox}
+The lower monotone curve is the \textbf{training error}; the U-shaped curve is the \textbf{test/validation error}. \textbf{Bias} $\approx$ the floor of the training error (model too simple); \textbf{variance} $\approx$ the gap between test and training error; \textbf{generalisation error} $\approx$ the test error.\\
+Reduce \emph{bias}: bigger/more expressive model, train longer, better features. Reduce \emph{variance}: more data, regularisation, dropout, early stopping, simpler model. \emph{Test/generalisation} error: address whichever dominates (bias or variance).
+\end{answerbox}
+
+\q (Bias/variance table) State the effect of each operation on bias and variance.
+\begin{answerbox}
+Regularising the weights: bias $\uparrow$, variance $\downarrow$. Increasing layer size (more units): bias $\downarrow$, variance $\uparrow$. Dropout: bias $\uparrow$ (slightly), variance $\downarrow$. More training data (same distribution): bias no change, variance $\downarrow$.
+\end{answerbox}
+
+\q How do training and validation cost change as the total number of samples grows? Label the early-stopping figure.
+\begin{answerbox}
+With more data the training cost rises slightly (harder to fit all of it) while the validation cost falls; the two converge. Early-stopping figure: (1) vertical axis = error/cost, (2) horizontal axis = epochs, (3) value on vertical = minimum validation error, (4) value on horizontal = the epoch where validation error is lowest (stop here), (5) U-shaped curve = validation/test error, (6) monotone decreasing curve = training error.
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Cost Functions}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q What is a cost function used for? Give the typical cost for regression, binary, and multi-class classification.
+\begin{answerbox}
+It measures how far predictions are from the targets and provides the scalar signal that is minimised during training. Regression $\to$ \textbf{MSE}. Binary $\to$ \textbf{binary cross-entropy} (negative log-likelihood of a Bernoulli). Multi-class $\to$ \textbf{categorical cross-entropy} with softmax. The cross-entropies measure the divergence between predicted and true class distributions, giving strong gradients for confident mistakes.
+\end{answerbox}
+
+\q Write the linear-regression update step, then add L2 regularisation. Effect?
+\begin{answerbox}
+Plain: $\theta \leftarrow \theta - \eta \nabla L$. With $J = L + \lambda\lVert\theta\rVert_2^2$, $\nabla J = \nabla L + 2\lambda\theta$, so
+\[ \theta \leftarrow (1-2\eta\lambda)\,\theta - \eta\nabla L. \]
+The factor $(1-2\eta\lambda)<1$ shrinks the weights every step (weight decay), lowering variance/overfitting.
+\end{answerbox}
+
+\q Why is cross-entropy better suited to classification than MSE?
+\begin{answerbox}
+Paired with softmax/sigmoid, CE gives a non-vanishing gradient ($\hat y - y$) even for confident errors, so learning stays fast; MSE's gradient is scaled by the saturating activation's derivative and goes to zero there, slowing or stalling training. CE also matches the maximum-likelihood objective for categorical outputs.
+\end{answerbox}
+
+\q Compute the cross-entropy for labels $y=1,3,2$ and predictions $\hat y=(0.4,0.3,0.3),(0.3,0.5,0.2),(0.3,0.5,0.2)$.
+\begin{answerbox}
+Per sample, $\mathrm{CE}=-\ln(\text{prob of the true class})$:
+\begin{itemize}[leftmargin=*,nosep]
+\item Sample 1, class 1: $-\ln 0.4 = 0.916$
+\item Sample 2, class 3: $-\ln 0.2 = 1.609$
+\item Sample 3, class 2: $-\ln 0.5 = 0.693$
+\end{itemize}
+Sum $= 3.219$, mean $\approx 1.073$ (natural log).
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Gradient Descent \& Optimisation}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q When is gradient descent applicable, and what does it converge to?
+\begin{answerbox}
+It needs a loss that is differentiable (almost everywhere) w.r.t.\ the parameters. With a small enough learning rate it converges to a stationary point: a local minimum for non-convex losses, the global minimum if the loss is convex.
+\end{answerbox}
+
+\q Why is GD a ``local'' learning principle and what are the implications?
+\begin{answerbox}
+Each update uses only the gradient at the current point -- no global view of the surface. Implications: it can get stuck in local minima, saddle points, or plateaus, and the outcome depends on the initialisation and learning rate.
+\end{answerbox}
+
+\q Characteristics and pros/cons of batch vs mini-batch vs (pure) stochastic GD. Why is mini-batch preferred?
+\begin{answerbox}
+Batch: exact gradient, stable, but slow and memory-heavy. SGD (size 1): cheap and very noisy, can escape poor minima but unstable and not vectorisable. Mini-batch: a balance -- reasonably accurate gradient, efficient on GPUs, and enough noise to regularise. Preferred because it combines hardware efficiency with frequent, mildly-noisy updates.
+\end{answerbox}
+
+\q Pseudocode for mini-batch GD, and PyTorch loops with and without a predefined optimizer.
+\begin{answerbox}
+See the code blocks below. Both PyTorch versions do the same update; one delegates it to \texttt{optimizer.step()}, the other does it manually under \texttt{torch.no\_grad()}.
+\end{answerbox}
+\begin{verbatim}
+# Mini-batch GD pseudocode
+for epoch in range(nepochs):
+    shuffle(data)                      # shape (m, n)
+    for Xb in minibatches(data, B):    # B samples per batch
+        g = mean_k( gradient(p, Xb[k]) )
+        p = p - lr * g
+
+# PyTorch -- with optimizer
+opt = torch.optim.SGD([model.p], lr=lr)
+for epoch in range(nepochs):
+    for xb, yb in loader:
+        opt.zero_grad()
+        loss = mse(model(xb), yb)
+        loss.backward()
+        opt.step()
+
+# PyTorch -- without optimizer
+for epoch in range(nepochs):
+    for xb, yb in loader:
+        loss = mse(model(xb), yb)
+        loss.backward()
+        with torch.no_grad():
+            model.p -= lr * model.p.grad
+            model.p.grad = None
+\end{verbatim}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Optimizers (contour plot)}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Match the trajectories to SGD, Momentum, RMSProp, Adam and justify.
+\begin{answerbox}
+Identify by trajectory \emph{signature}:
+\begin{itemize}[leftmargin=*,nosep]
+\item Overshoots the minimum and oscillates back and forth $\Rightarrow$ \textbf{Momentum} (accumulated velocity carries it past the minimum).
+\item Quickly damps the steep direction, then advances steadily along the shallow valley $\Rightarrow$ \textbf{RMSProp} (per-parameter scaling by recent gradient magnitude).
+\item Smooth, well-damped path that settles cleanly at the minimum $\Rightarrow$ \textbf{Adam} (momentum + adaptive scaling + bias correction).
+\item Slowest, crawls along the dominant gradient direction without adapting $\Rightarrow$ \textbf{plain SGD}.
+\end{itemize}
+(Match each printed colour to the behaviour above.)
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{General Machine Learning}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Draw and describe a typical ML pipeline.
+\begin{answerbox}
+Data collection $\to$ cleaning/preprocessing $\to$ train/validation/test split $\to$ feature/representation $\to$ model choice $\to$ training $\to$ validation \& hyperparameter tuning $\to$ test evaluation $\to$ deployment \& monitoring. Each step matters: e.g.\ the split prevents information leakage; validation enables honest tuning; monitoring catches drift after deployment.
+\end{answerbox}
+
+\q What is the risk of tuning hyperparameters on the test set (explained simply)?
+\begin{answerbox}
+It is like practising with the final exam's answer key: you will score well on that exact test but won't have learned to generalise, and the score is no longer an honest estimate of real-world performance.
+\end{answerbox}
+
+\q In SGD/mini-batch GD, what is the risk of not shuffling, and when do you shuffle?
+\begin{answerbox}
+If the data are ordered (e.g.\ grouped by class), consecutive batches are unrepresentative, biasing the gradient and causing oscillation or slow/poor convergence. Shuffle at the start of every epoch.
+\end{answerbox}
+
+\q Tumor-detection model: which performance metrics?
+\begin{answerbox}
+Prioritise \textbf{recall/sensitivity} (a missed tumor -- false negative -- is dangerous), alongside precision, F1, and ROC-AUC; report a confusion matrix and account for class imbalance and the decision threshold. Accuracy alone is misleading when positives are rare.
+\end{answerbox}
+
+\q (Confusion matrix) Rows = true A/B/C; columns = predicted. $A=(20,2,3)$, $B=(4,10,1)$, $C=(3,2,15)$.
+\begin{answerbox}
+Use the \textbf{test} set. Total $=25+15+20=60$.\\
+2$\times$2 for class A: TP$=20$, FN$=5$, FP$=7$, TN$=28$.\\
+Accuracy $=(20+10+15)/60=45/60=75\%$; error rate $=25\%$.\\
+Recall (TP/row): A $20/25=0.80$, B $10/15\approx0.67$, C $15/20=0.75$.\\
+Precision (TP/column): A $20/27\approx0.74$, B $10/14\approx0.71$, C $15/19\approx0.79$.
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Representational Capacity}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Several models of different complexity produce different error rates -- which error goes with which model?
+\begin{answerbox}
+Higher capacity $\Rightarrow$ lower \emph{training} error. Assign the lowest training error to the most complex model; for test error pick the U-shape: the simplest underfits (high train and test), the most complex overfits (lowest train, higher test), an intermediate one gives the best test error.
+\end{answerbox}
+
+\q What does the universal approximation theorem imply for shallow networks?
+\begin{answerbox}
+One hidden layer with enough units can approximate any continuous function on a compact set arbitrarily well -- but ``enough'' may be exponentially large, and the theorem says nothing about whether such weights can be \emph{learned} or will \emph{generalise}.
+\end{answerbox}
+
+\q Difficulties of shallow networks; how do deep ones help?
+\begin{answerbox}
+Shallow nets may need impractically many units and tend to memorise. Depth reuses features hierarchically (edges $\to$ parts $\to$ objects), representing complex functions with far fewer parameters and generalising better.
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Activation Functions}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Why are non-linear activations essential?
+\begin{answerbox}
+Without them a stack of layers collapses to a single linear map, so the network could only represent linear functions. Non-linearities give it the power to model complex, non-linear relationships.
+\end{answerbox}
+
+\q Pros/cons of ReLU vs sigmoid; typical uses and issues.
+\begin{answerbox}
+ReLU: cheap, non-saturating for positive inputs, induces sparsity, mitigates vanishing gradients -- but ``dying ReLU'' (units stuck at 0) and unbounded output; used in hidden layers. Sigmoid: smooth, bounded in $(0,1)$, ideal for probabilities -- but saturates (vanishing gradients) and is not zero-centred; used at binary outputs.
+\end{answerbox}
+
+\q For $\sigma(wx+b)$ vs $w=1,b=0$, describe the impact of a negative bias, a large positive weight ($w=10$), a small negative weight ($w=-0.5$).
+\begin{answerbox}
+Negative bias: shifts the curve right -- a larger $x$ is needed to ``turn on'', so activation is lower at a given $x$. Large positive weight ($w=10$): the sigmoid becomes very steep, approaching a hard step/threshold. Small negative weight ($w=-0.5$): flips the response (now decreasing in $x$) and flattens it (gentle slope).
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Multi-Layer Perceptron}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Trainable parameters for an MLP with layer sizes 100, 50, 20 on $3\times20\times20$ images.
+\begin{answerbox}
+Input $=3\cdot20\cdot20=1200$.
+$(1200{\to}100): 1200\cdot100+100=120100$;
+$(100{\to}50): 100\cdot50+50=5050$;
+$(50{\to}20): 50\cdot20+20=1020$.
+\textbf{Total $=126170$.}
+\end{answerbox}
+
+\q RAM for a binary classifier on $3\times64\times64$ images, one hidden layer of 100 units, 64-bit floats.
+\begin{answerbox}
+Input $=3\cdot64\cdot64=12288$. Hidden: $12288\cdot100+100=1{,}228{,}900$. Output (1 sigmoid unit): $100+1=101$. Total $\approx1{,}229{,}001$ params.
+RAM $=1{,}229{,}001\times 8\text{ bytes}\approx 9.83$ MB ($\approx 9.38$ MiB).
+\end{answerbox}
+
+\q Softmax (row-wise) of $z=\begin{psmallmatrix}1&0&2\\0&3&1\\2&2&0\end{psmallmatrix}$, written with exponentials.
+\begin{answerbox}
+Row 1: $(e,\,1,\,e^{2})/(e+1+e^{2})$.\\
+Row 2: $(1,\,e^{3},\,e)/(1+e^{3}+e)$.\\
+Row 3: $(e^{2},\,e^{2},\,1)/(2e^{2}+1)$.
+\end{answerbox}
+
+\q Input $x=(4,2,1)$, $w=(0.5,-0.1,0)$, $b=0.2$, activations $g_i\in\{$sigmoid, relu, heaviside, linear$\}$ with $a_1\le a_2\le a_3\le a_4$. Match.
+\begin{answerbox}
+$z = 0.5\cdot4 - 0.1\cdot2 + 0 + 0.2 = 2.0$. With $z=2>0$: sigmoid$(2)=0.881$, heaviside$=1$, relu$=2$, linear$=2$.
+Ordering: $a_1=$ \textbf{sigmoid} ($0.88$) $\le a_2=$ \textbf{heaviside} ($1$) $\le a_3,a_4=$ \textbf{relu}, \textbf{linear} (both $=2$, interchangeable).
+\end{answerbox}
+
+\q Why do we need a bias?
+\begin{answerbox}
+It shifts the activation threshold so the neuron is not forced through the origin, letting it fit data that are not centred and increasing flexibility.
+\end{answerbox}
+
+\q Why random weight initialisation, and why does the scale matter?
+\begin{answerbox}
+Random values break symmetry -- identical weights make all neurons in a layer learn the same thing. The scale matters because too-large weights saturate activations / explode gradients and too-small ones vanish the signal; hence Xavier (tanh/sigmoid) or He (ReLU) scaling.
+\end{answerbox}
+
+\q $3\times500\times500$ image, flattened, into a fully-connected layer of 100 units -- weight and bias shapes? And params of a conv layer with 10 filters of $5\times5$?
+\begin{answerbox}
+Flatten $=750000$. Weight matrix $(100, 750000)$, bias $(100,)$. Conv layer: $(5\cdot5\cdot3+1)\cdot10 = 760$ parameters.
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Batch Normalisation}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q (Fill the blanks) Shapes in a batch-normalised relu layer, input $X$ of shape (batchsize, $n_1$), output of width $n_2$.
+\begin{answerbox}
+$W$: $(n_1, n_2)$; $b$: $(n_2,)$; $\gamma$: $(n_2,)$; $\beta$: $(n_2,)$; output $A$: (batchsize, $n_2$).
+\end{answerbox}
+\begin{verbatim}
+Z = X @ W + b                      # (batchsize, n2)
+H = np.maximum(0, Z)               # relu
+mu  = H.mean(axis=0)               # (n2,)
+var = H.var(axis=0)                # (n2,)
+Hnorm = (H - mu) / np.sqrt(var + eps)
+A = gamma * Hnorm + beta           # (batchsize, n2)
+# (order affine->relu->BN follows the question;
+#  the common order is BN *before* the activation)
+\end{verbatim}
+
+\q Compute $z_{\text{norm}}$ and the relu activations for $z=\begin{psmallmatrix}12&0&-5\\14&10&5\\14&10&5\\12&0&-5\end{psmallmatrix}$ ($\gamma=1,\beta=0$).
+\begin{answerbox}
+Normalise each column (unit) over the $m=4$ samples:\\
+Col 1 $(12,14,14,12)$: mean $13$, var $1 \Rightarrow (-1,1,1,-1)$.\\
+Col 2 $(0,10,10,0)$: mean $5$, var $25 \Rightarrow (-1,1,1,-1)$.\\
+Col 3 $(-5,5,5,-5)$: mean $0$, var $25 \Rightarrow (-1,1,1,-1)$.\\
+So $z_{\text{norm}}$ rows: $(-1,-1,-1),(1,1,1),(1,1,1),(-1,-1,-1)$. After relu:
+\[ A=\begin{psmallmatrix}0&0&0\\1&1&1\\1&1&1\\0&0&0\end{psmallmatrix}. \]
+\end{answerbox}
+
+\q How many parameters does batch norm add? Two benefits? Behaviour at test time?
+\begin{answerbox}
+Adds $2$ per unit ($\gamma,\beta$) $\Rightarrow 2n$ (here $2\cdot3=6$). Benefits: faster/stabler training (allows higher learning rates), reduces internal covariate shift, mild regularisation, less sensitivity to initialisation. At test/production time it uses the \emph{running} (moving-average) mean and variance gathered during training instead of batch statistics.
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Regularisation}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q How does L2 modify the GD update, and why is it called ``weight decay''?
+\begin{answerbox}
+$\theta \leftarrow (1-2\eta\lambda)\theta - \eta\nabla L$. The multiplicative factor $(1-2\eta\lambda)<1$ shrinks (``decays'') the weights toward zero on every step, independently of the data gradient.
+\end{answerbox}
+
+\q Dropout steps at train and test time, and why it regularises.
+\begin{answerbox}
+Train: each step, zero each unit with probability $p$ and scale the survivors by $1/(1-p)$ (inverted dropout). Test: no dropping -- use the full network. It prevents co-adaptation (a unit can't rely on specific others) and effectively averages an ensemble of sub-networks, reducing overfitting.
+\end{answerbox}
+
+\q Why does mini-batch GD have a regularising effect? Why does batch norm?
+\begin{answerbox}
+Mini-batch: the gradient noise from random sampling acts like injected noise, discouraging sharp overfitted minima. Batch norm: each sample's normalisation depends on the random batch it lands in, adding similar stochasticity.
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Computational Graphs \& Backprop}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q For $f(x,w,b)=1+\dfrac{1}{1+(wx+b)^2}$, give the computational graph and gradients.
+\begin{answerbox}
+Let $u=wx+b \to v=u^2 \to s=1+v \to r=1/s \to f=1+r$. Local gradients: $\partial f/\partial r=1$, $\partial r/\partial s=-1/s^2$, $\partial s/\partial v=1$, $\partial v/\partial u=2u$, $\partial u/\partial w=x$, $\partial u/\partial b=1$, $\partial u/\partial x=w$. Chain:
+\[ \frac{\partial f}{\partial w} = \frac{-2u\,x}{(1+u^2)^2},\quad
+   \frac{\partial f}{\partial b} = \frac{-2u}{(1+u^2)^2},\quad
+   \frac{\partial f}{\partial x} = \frac{-2u\,w}{(1+u^2)^2},\ \ u=wx+b. \]
+\end{answerbox}
+
+\q Graph $z=x+y \to u=z^p \to L(u)$: local gradients at the nodes and gradients on the edges.
+\begin{answerbox}
+Node (1) $=z^p$: local $\partial u/\partial z = p\,z^{p-1}$. Node (2) $=+$: locals $\partial z/\partial x=1$, $\partial z/\partial y=1$.
+Edge (3): $\partial L/\partial z = (\partial L/\partial u)\,p\,z^{p-1}$. Edge (4): $\partial L/\partial x = \partial L/\partial z$. Edge (5): $\partial L/\partial y = \partial L/\partial z$.
+\end{answerbox}
+
+\q Two-hidden-layer net, $f=w^{[3]}_1 a^{[2]}_1 + w^{[3]}_2 a^{[2]}_2$, $a^{[2]}=\sigma(z^{[2]})$: compute $\partial f/\partial z^{[2]}_1$ and $\partial f/\partial w^{[2]}_{2k}$.
+\begin{answerbox}
+\[ \frac{\partial f}{\partial z^{[2]}_1} = w^{[3]}_1\,\sigma'(z^{[2]}_1), \qquad
+   \frac{\partial f}{\partial w^{[2]}_{2k}} = w^{[3]}_2\,\sigma'(z^{[2]}_2)\,a^{[1]}_k. \]
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Gradient Descent with PyTorch}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q What does the snippet do, and what are the final $x$ and \texttt{fun(x)}? (\texttt{fun(x)=(x**2-1)**2}, $lr=0.01$, $n=100$, start $x=2$.)
+\begin{answerbox}
+$\texttt{fun}(x)=(x^2-1)^2$ is minimised where $x^2=1$, i.e.\ $x=\pm1$ (value $0$). The loop runs 100 GD steps: \texttt{y.backward()} fills \texttt{x.grad} via autograd, the update happens under \texttt{no\_grad}, and the grad is reset. Starting from $x=2$ it converges to $x\approx1$ with $\texttt{fun}(x)\approx0$.
+\end{answerbox}
+
+\q Why is \texttt{torch.no\_grad()} needed?
+\begin{answerbox}
+The weight update is not part of the model's forward computation; wrapping it stops autograd from recording it, avoiding a spurious graph/gradient through the update and saving memory.
+\end{answerbox}
+
+\q Why call \texttt{optimizer.zero\_grad()} each mini-batch?
+\begin{answerbox}
+PyTorch \emph{accumulates} (sums) gradients across \texttt{backward()} calls; without zeroing, gradients from previous batches would add up and corrupt the current step.
+\end{answerbox}
+
+\q Key structure behind automatic gradients? What is autograd?
+\begin{answerbox}
+The \textbf{computational graph} traversed in reverse (reverse-mode automatic differentiation = backprop). \textbf{Autograd} is PyTorch's engine: as operations run on tensors with \texttt{requires\_grad}, it records them into a dynamic graph; \texttt{backward()} then applies the chain rule through that graph to compute gradients of a scalar output w.r.t.\ all leaf tensors.
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Convolutional Neural Networks}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Conv layer $k=10$, $f=5$, $p=0$, $s=2$ on a $28\times28\times3$ input: output shape and number of parameters.
+\begin{answerbox}
+$O=\lfloor(28-5)/2\rfloor+1 = 11+1 = 12 \Rightarrow 12\times12\times10$. Parameters $=(5\cdot5\cdot3+1)\cdot10 = 760$.
+\end{answerbox}
+
+\q Output shape through the stack on $28\times28\times3$.
+\begin{answerbox}
+L1 $(10,5\times5,p{=}1,s{=}2)$: $\lfloor(28-5+2)/2\rfloor+1=13 \Rightarrow 13\times13\times10$.\\
+Max-pool $2\times2$, $s{=}2$: $\lfloor(13-2)/2\rfloor+1=6 \Rightarrow 6\times6\times10$.\\
+L3 $(15,3\times3,p{=}2,s{=}2)$: $\lfloor(6-3+4)/2\rfloor+1=4 \Rightarrow 4\times4\times15$.\\
+L4 $(20,1\times1,p{=}0,s{=}1)$: $\Rightarrow 4\times4\times20$. \textbf{Final: $4\times4\times20$.}
+\end{answerbox}
+
+\q What padding makes output = input for $f=5$, $s=1$?
+\begin{answerbox}
+$p=(f-1)/2 = 2$ (``same'' padding).
+\end{answerbox}
+
+\q After a conv + max-pool, what must be cached for back-propagation?
+\begin{answerbox}
+The \textbf{argmax positions} -- which input element was the maximum in each pooling window -- so the gradient is routed only to those positions (others get zero). (For the conv, the inputs/activations are cached as usual.)
+\end{answerbox}
+
+\q (MCQ) Which statements about max-pooling are true?
+\begin{answerbox}
+(1) ``Larger receptive field'' -- \textbf{True}. (2) ``Increases the number of parameters'' -- \textbf{False} (pooling has none). (3) ``Increases sensitivity to feature position'' -- \textbf{False} (it \emph{decreases} it, adding translation invariance). \textbf{Only (1) is true.}
+\end{answerbox}
+
+\q Deduce the filters that produced the edge maps; give a $3\times3$ horizontal-edge filter.
+\begin{answerbox}
+The outputs are vertical- and horizontal-edge maps, produced by gradient/Sobel-type filters. A horizontal-edge (Sobel) filter: $\begin{psmallmatrix}1&1&1\\0&0&0\\-1&-1&-1\end{psmallmatrix}$; the vertical-edge filter is its transpose.
+\end{answerbox}
+
+\q (From the keras summary) Provide the code and the role of each layer.
+\begin{answerbox}
+Layers: Conv2D(32,(3,3)) on $28\times28\times1$ (320 params) $\to$ Activation relu $\to$ MaxPool $2\times2 \to$ Dropout $\to$ Flatten ($13\cdot13\cdot32=5408$) $\to$ Dense(128) relu ($692352$) $\to$ Dense(10) softmax ($1290$). Conv extracts local features; relu adds non-linearity; pooling downsamples/adds invariance; dropout regularises; flatten vectorises; the dense layers classify.
+\end{answerbox}
+\begin{verbatim}
+model = Sequential([
+    Conv2D(32, (3,3), input_shape=(28,28,1)),   # 320
+    Activation('relu'),
+    MaxPooling2D((2,2)),                          # -> 13x13x32
+    Dropout(0.25),
+    Flatten(),                                    # -> 5408
+    Dense(128, activation='relu'),                # 692352
+    Dense(10, activation='softmax'),              # 1290
+])
+\end{verbatim}
+
+\q What do filters (a),(b),(c) detect? Give a horizontal-edge filter. What is the idea of $1\times1$ convolutions?
+\begin{answerbox}
+(a) a vertical line/edge (responds to a vertical stripe); (b) a diagonal line; (c) a corner / top-left ``L''. Horizontal-edge filter as in the Sobel example above. $1\times1$ convolutions mix and reduce (or expand) channel depth cheaply -- dimensionality reduction plus an extra non-linearity (used in Inception/bottleneck blocks).
+\end{answerbox}
+
+\q Activation maximisation; MNIST augmentation; invariance MCQ.
+\begin{answerbox}
+\textbf{Activation maximisation}: freeze the weights, start from a random/noise input, and do gradient \emph{ascent} on a chosen unit's activation w.r.t.\ the input (with light regularisation) to reveal the pattern that excites it. \textbf{MNIST augmentation}: small rotations, shifts, scaling, zoom, elastic distortions -- \emph{not} horizontal flips (they change the digit). Expected curves: with augmentation train accuracy may rise more slowly, but validation/test accuracy is higher and the train--test gap smaller. \textbf{Invariance}: a one-conv-layer CNN is (approximately) \emph{translation} invariant (statement 3), via weight sharing + pooling, but \emph{not} scale or rotation invariant.
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Deep Network Architectures}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Two key innovations of GoogLeNet, and the structure of its new layer.
+\begin{answerbox}
+Innovations: the \textbf{Inception module} (parallel multi-scale convolutions) and \textbf{$1\times1$ convolutions} for dimensionality reduction (plus auxiliary classifiers and global average pooling). The Inception module runs parallel $1\times1$, $3\times3$, $5\times5$ convs and a $3\times3$ max-pool branch, with $1\times1$ ``bottleneck'' convs cutting channels before the costly convs, then concatenates all branch outputs along the channel axis -- capturing several scales cheaply.
+\end{answerbox}
+
+\q Inception parameters and output dimension (input $10\times30\times30$).
+\begin{answerbox}
+Per branch: $(\,k_h k_w C_{in}+1)\,C_{out}$, summed over branches plus the $1\times1$ reductions. With ``same'' padding the spatial size stays $30\times30$ and output channels $=$ sum of the branch output channels. (The exact number needs the per-branch filter counts from the module diagram, which aren't fully specified here -- show the formula and method.)
+\end{answerbox}
+
+\q How does GoogLeNet handle the backprop problems of very deep nets?
+\begin{answerbox}
+\textbf{Auxiliary classifiers} attached to intermediate layers inject extra gradient signal during training, mitigating vanishing gradients deep in the stack (their losses are added with a small weight and dropped at inference).
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Transfer Learning}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q ResNet: key ingredients, the key innovation, and what made 152 layers trainable.
+\begin{answerbox}
+Residual blocks with \textbf{identity skip connections} ($y=\mathcal{F}(x)+x$), heavy \textbf{batch normalisation}, and \textbf{bottleneck} ($1\times1$--$3\times3$--$1\times1$) blocks. Key innovation: skip connections let gradients flow directly and let layers learn a residual, so adding depth no longer degrades accuracy. BN + bottlenecks made the 152-layer model trainable.
+\end{answerbox}
+
+\q Flower classifier: limited labelled data, must run on a phone. Architecture, preprocessing, flow.
+\begin{answerbox}
+Use \textbf{transfer learning} with a lightweight pretrained backbone (e.g.\ MobileNet / EfficientNet-lite): freeze most layers, train a new classifier head, then optionally fine-tune the top layers with a small learning rate. \textbf{Preprocessing}: resize to the backbone's input size, normalise with the pretrained mean/std, augment (flip, rotate, crop, colour jitter). \textbf{Flow}: image $\to$ resize/normalise $\to$ augment (train only) $\to$ pretrained CNN features $\to$ new head $\to$ softmax over flower classes.
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Non-Sequential Architectures}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Explain the multi-branch concatenate model code.
+\begin{answerbox}
+It is a functional (non-sequential) model: the same input feeds two \emph{parallel} feature extractors (a $3\times3$-conv branch and a $5\times5$-conv branch, each with pooling + flatten); their features are concatenated and passed to a Dense(100) then a 10-way softmax. Two receptive-field scales are combined before classification.
+\end{answerbox}
+
+\q Implement the depicted two-input model and compute its parameters; what is it for?
+\begin{answerbox}
+Two inputs $28\times28\times1 \to$ Conv 16 $3\times3 \to$ pool (each) $\to$ concatenate $\to$ Conv 32 $5\times5 \to$ pool $\to$ Dense 32 $\to$ Dense 10. Parameters (valid padding, $2\times2$ pool, $s{=}2$): branch convs $2\times160=320$; Conv 32 $5\times5$ on 32 channels $=(5\cdot5\cdot32+1)\cdot32=25632$; Dense 32 $=512\cdot32+32=16416$; Dense 10 $=330$. \textbf{Total $\approx 42698$.} Purpose: fuse two inputs/views (e.g.\ a stereo pair, or two filter scales) into one classifier.
+\end{answerbox}
+
+\q Classifier for image \emph{pairs} of different shapes (two cameras).
+\begin{answerbox}
+Two separate input branches, each its own CNN sized to its input shape, each ending in global pooling/flatten; concatenate the two feature vectors and feed a shared dense classifier. (Two encoders $\to$ concatenate $\to$ dense $\to$ softmax.)
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Recurrent Neural Networks}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Five RNN applications and why RNNs help.
+\begin{answerbox}
+Language modelling/text generation, machine translation, speech recognition, time-series forecasting, sequence/sentiment classification. RNNs help because a recurrent hidden state carries information across time, modelling order and temporal dependencies.
+\end{answerbox}
+
+\q How do recurrent layers differ from convolutional ones; how is parameter sharing done in each?
+\begin{answerbox}
+RNNs process a sequence step by step with a state; CNNs apply filters over space in parallel. RNNs \textbf{share weights across time steps} (same recurrent matrices each step); CNNs \textbf{share weights across spatial positions} (same filter slid over the image). Both reduce parameters and encode a structural prior.
+\end{answerbox}
+
+\q Typical data-preparation steps for sequence classification.
+\begin{answerbox}
+Tokenise, build a vocabulary, map tokens to indices, pad/truncate to a fixed length (\texttt{maxlen}), optionally embed; then batch and split into train/val/test.
+\end{answerbox}
+
+\q Parameters of \texttt{SimpleRNN(64)} + \texttt{Dense(2)}, input\_shape $=$ (maxlen, len\_vocab).
+\begin{answerbox}
+SimpleRNN $=(\text{input\_dim}+\text{units})\cdot\text{units}+\text{units} = (\text{len\_vocab}+64)\cdot64 + 64 = 64\cdot\text{len\_vocab}+4160$. Dense(2) $=64\cdot2+2=130$. \textbf{Total $=64\cdot\text{len\_vocab}+4290$} (substitute len\_vocab).
+\end{answerbox}
+
+\q SimpleRNN training problems; why vanishing gradients are worse in RNNs; how LSTM/GRU help; add regularisation.
+\begin{answerbox}
+Problems: vanishing/exploding gradients over long sequences (can't learn long-range dependencies) and slow sequential training. Worse in RNNs because the \emph{same} recurrent weight is multiplied repeatedly through time, so its powers shrink or blow up; worse in SimpleRNNs than LSTMs because they lack gated, additive state updates. \textbf{LSTM/GRU} add a gated cell state with additive updates (forget/input/output, or update/reset gates) so gradients persist. Other aids: gradient clipping, good init, attention/Transformers. \textbf{Regularisation}: add \texttt{dropout}/\texttt{recurrent\_dropout} in the RNN layer and/or L2 on the weights, plus a Dropout layer before the Dense head.
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Seq2Seq, Attention, Transformers}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q What is specific about a seq2seq model? Draw the schema for ``Jean est ici'' $\to$ ``John is here''. Typical problem and solution?
+\begin{answerbox}
+An \textbf{encoder} RNN compresses the input sequence into a context vector; a separate \textbf{decoder} RNN generates the output from it -- input and output lengths can differ. Schema: encoder reads Jean/est/ici $\to$ context; decoder, seeded with \texttt{<go>}, emits John, is, here, \texttt{<eos>}, each step fed the previous output. \textbf{Problem}: the single fixed context vector is a bottleneck for long inputs (forgetting). \textbf{Solution}: \textbf{attention} -- let the decoder read a weighted combination of all encoder states at each step.
+\end{answerbox}
+
+\q Principle of attention; what is the alignment vector and how is it computed?
+\begin{answerbox}
+Attention lets each decoder step focus on the most relevant encoder positions. The \textbf{alignment vector} is the softmax of similarity scores between the current decoder state (\emph{query}) and each encoder state (\emph{keys}); these weights form a context as the weighted sum of the encoder states (\emph{values}).
+\end{answerbox}
+
+\q ``Attention is all you need''; True/False on classical Transformers; meaning of ``self''.
+\begin{answerbox}
+The title reflects that the model drops recurrence and convolution entirely, relying only on attention (+ feed-forward layers). T/F: better parallelisation -- \textbf{True}; handles larger training sets -- \textbf{True}; has encoder and decoder like seq2seq -- \textbf{True}; decoder blocks have 2 layers -- \textbf{False} (a decoder block has \emph{three} sub-layers: masked self-attention, encoder--decoder cross-attention, feed-forward; the encoder block has two). \textbf{``Self''}-attention: tokens attend to other tokens \emph{within the same sequence} (Q, K, V all come from that sequence).
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Autoencoders \& Generative Models}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Design a denoising autoencoder and its training steps.
+\begin{answerbox}
+An encoder--decoder (often convolutional) trained to reconstruct the \emph{clean} image from a \emph{noised} input. Steps: add synthetic noise to inputs, set the clean image as the target, minimise reconstruction loss (e.g.\ MSE), validate on held-out noisy images.
+\end{answerbox}
+
+\q Typical autoencoder applications.
+\begin{answerbox}
+Dimensionality reduction, denoising, anomaly detection (high reconstruction error flags anomalies), unsupervised pretraining/representation learning, compression.
+\end{answerbox}
+
+\q VAE vs plain AE: advantages/disadvantages. Key ingredient turning an AE into a VAE.
+\begin{answerbox}
+A VAE has a smooth, continuous, probabilistic latent space you can sample from to generate new data; a plain AE's latent is irregular (``holes'') -- good for reconstruction, poor for generation -- and VAE samples tend to be blurrier. Key ingredient: a \textbf{probabilistic latent} -- the encoder outputs a distribution $q(z|x)$, a KL term regularises it toward $\mathcal{N}(0,I)$, and the \textbf{reparameterisation trick} keeps sampling differentiable. It is responsible for a well-structured, sampleable latent space.
+\end{answerbox}
+
+\q Why a VAE (not a plain AE) as a generator; how to sample; VAE as feature extractor; GAN training and naming; why GANs are harder; diffusion idea.
+\begin{answerbox}
+\textbf{VAE generator}: its latent is regularised toward $\mathcal{N}(0,I)$, so random $z$ decode to plausible images; a plain AE's latent isn't continuous/filled, so random $z$ give garbage. \textbf{Sample}: draw $z\sim\mathcal{N}(0,I)$ and pass it through the decoder. \textbf{Feature extractor}: use the encoder's latent mean as a compact representation. \textbf{GAN training}: a generator turns noise into fakes; a discriminator learns real-vs-fake; they play a minimax game, updated alternately until fakes are indistinguishable. \textbf{Names}: ``generative'' (produces samples) + ``adversarial'' (G and D compete). \textbf{Harder than VAE}: a non-stationary two-player objective $\to$ instability, oscillation, mode collapse, and a delicate G/D balance (vs the VAE's single stable likelihood-based loss). \textbf{Diffusion}: gradually add Gaussian noise to data (forward), train a network to reverse it step by step, then generate by denoising from pure noise.
+\end{answerbox}
+
+\q (Encoder/Decoder/Discriminator figure) Roles and a step-by-step training procedure.
+\begin{answerbox}
+This is a VAE+GAN hybrid. \textbf{Encoder} maps $x\to q(z|x)$; \textbf{Decoder/Generator} reconstructs/generates images from $z$; \textbf{Discriminator} judges real vs generated. Training (alternate): (1) encoder + decoder minimise reconstruction + KL (VAE part); (2) the discriminator maximises real-vs-fake accuracy; (3) the decoder additionally tries to fool the discriminator (adversarial part).
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Case Study 1 -- AlphaTicTacToe Zero}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{(\alph*)}]
+
+\q Convert the $3\times3$ board into a network input.
+\begin{answerbox}
+One-hot encode each of the 9 cells into 3 states $\{\times, \circ, \text{empty}\}$ $\to$ a $3\times3\times3$ (=27) tensor (equivalently two binary planes, one for $\times$ and one for $\circ$). Flatten for an MLP.
+\end{answerbox}
+
+\q Sketch a single-hidden-layer (size 3) network with two outputs $\vec a$ (9) and $v$ (scalar).
+\begin{answerbox}
+Input layer (27 nodes) $\to$ one hidden layer (3 nodes, relu) $\to$ \emph{two heads from the same hidden layer}: a policy head $\vec a$ (9 nodes, softmax) and a value head $v$ (1 node, tanh). The shared trunk feeds both heads.
+\end{answerbox}
+
+\q Activation for $\vec a$? For $v$?
+\begin{answerbox}
+$\vec a$: \textbf{softmax} (a probability distribution over the 9 moves). $v$: \textbf{tanh} (scalar in $[-1,1]$).
+\end{answerbox}
+
+\q Propose a valid loss over $T$ steps given targets $y_a^{<t>}$ (one-hot best move) and $y_v^{<t>}$.
+\begin{answerbox}
+Combine policy cross-entropy with value MSE over the $T$ states:
+\[ L = \sum_{t=1}^{T}\Big[\,-\!\sum_j (y_a^{<t>})_j \log (\hat a^{<t>})_j \;+\; \big(v^{<t>}-y_v^{<t>}\big)^2\,\Big]. \]
+Cross-entropy pushes the policy toward the given best move; MSE pushes the value toward the target outcome (the AlphaZero-style combined loss).
+\end{answerbox}
+
+\end{enumerate}
+
+% --------------------------------------------------
+\subsection{Case Study 2 -- Bird Recognition}
+% --------------------------------------------------
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Outline a strategy for the 3-camera bird-recognition system (DL? architecture? data prep? number of classes? evaluation?).
+\begin{answerbox}
+\textbf{Yes, deep learning (CNN).} The 3 simultaneous views suggest a \textbf{multi-input} network: three CNN branches with \emph{shared weights}, whose features are fused (concatenated) before the classifier -- or, more simply, classify the most-confident view. Given $\sim$1500 images/type and a need for efficiency, use \textbf{transfer learning} with a pretrained backbone. \textbf{Data prep}: resize/normalise, augment, and handle empty frames and out-of-set birds. \textbf{Classes}: 52 known $+$ UNKNOWN $+$ ``nothing/empty'' $=$ \textbf{54} (or 53 if ``nothing'' is folded into UNKNOWN). \textbf{Evaluation}: per-class precision/recall/F1 plus a macro-average, a confusion matrix, attention to class imbalance and to correctly rejecting UNKNOWN/empty (open-set), all on a held-out test set.
+\end{answerbox}
+
+\end{enumerate}
+
+\newpage
+% ##################################################
+\section{Additional Questions}
+% ##################################################
+% ==================================================
+\subsection{Introduction to Deep Learning -- Tensors}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q What distinguishes deep learning from classical machine learning?
+\begin{answerbox}
+Classical ML uses hand-crafted features fed to a model; deep learning \emph{learns} hierarchical features end-to-end from raw data. DL performance tends to keep improving with more data and compute, whereas classical methods plateau.
+\end{answerbox}
+
+\q A tensor has shape \texttt{(32, 3, 224, 224)}. State its rank and the typical meaning of each dimension.
+\begin{answerbox}
+Rank 4. Dimensions: batch size = 32, channels = 3 (RGB), height = 224, width = 224. Convention is (batch, channels, height, width).
+\end{answerbox}
+
+\q Given $A \in \mathbb{R}^{4\times 5}$ and $B \in \mathbb{R}^{5\times 2}$, what is the shape of $AB$? Is $BA$ defined?
+\begin{answerbox}
+$AB \in \mathbb{R}^{4\times 2}$ (inner dims 5 match). $BA$ is undefined: inner dimensions $2$ and $4$ do not match.
+\end{answerbox}
+
+\q Two tensors of shape \texttt{(3,1)} and \texttt{(1,4)} are added. What is the result shape?
+\begin{answerbox}
+Broadcasting stretches the size-1 axes, giving shape \texttt{(3,4)}.
+\end{answerbox}
+
+\end{enumerate}
+
+\begin{examtipbox}
+Forgetting that matrix multiplication requires matching \emph{inner} dimensions, and mixing up element-wise multiplication ($\odot$) with matrix multiplication.
+\end{examtipbox}
+
+% ==================================================
+\subsection{Learning and Optimisation}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Write the empirical risk (training objective) and explain each symbol.
+\begin{answerbox}
+$J(\theta) = \frac{1}{N}\sum_{i=1}^{N}\mathcal{L}(f(x_i;\theta), y_i)$. Average of the per-sample loss $\mathcal{L}$ over the $N$ training examples; $f(\cdot;\theta)$ is the model with parameters $\theta$.
+\end{answerbox}
+
+\q Which loss is used for multi-class classification and why?
+\begin{answerbox}
+Cross-entropy with a softmax output. It heavily penalizes confident wrong predictions and yields clean gradients ($\hat y - y$ when paired with softmax).
+\end{answerbox}
+
+\q What happens if the learning rate is set too high? Too low?
+\begin{answerbox}
+Too high: updates overshoot, loss oscillates or diverges. Too low: very slow convergence, may get stuck in poor regions or stall before reaching a good minimum.
+\end{answerbox}
+
+\q Contrast batch GD, SGD, and mini-batch GD.
+\begin{answerbox}
+Batch: full dataset per update -- stable but slow/memory-heavy. SGD: one sample -- fast, noisy, can escape shallow minima but high variance. Mini-batch: a batch of size $B$ -- the practical compromise, uses hardware well.
+\end{answerbox}
+
+\end{enumerate}
+
+% ==================================================
+\subsection{MLP, Overfitting, Regularisation}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Why do we need non-linear activation functions? What happens with only linear layers?
+\begin{answerbox}
+A composition of linear maps is itself linear, so a deep linear network is no more expressive than a single linear layer. Non-linearities let the network approximate arbitrary functions.
+\end{answerbox}
+
+\q Define overfitting and give three techniques to reduce it.
+\begin{answerbox}
+Overfitting = low training error but high test error; the model memorizes noise. Remedies: L1/L2 regularization, dropout, early stopping, data augmentation, more data, or a smaller model.
+\end{answerbox}
+
+\q How does dropout behave at training time versus test time?
+\begin{answerbox}
+At train time it randomly zeros activations with probability $p$ (and scales the rest). At test time no units are dropped; activations are scaled so the expected value matches training (inverted dropout does the scaling during training instead).
+\end{answerbox}
+
+\q Compare the effect of L1 and L2 regularization on the weights.
+\begin{answerbox}
+L2 (weight decay) shrinks all weights smoothly toward zero. L1 pushes many weights to exactly zero, producing sparse solutions / feature selection.
+\end{answerbox}
+
+\q Explain the bias--variance trade-off.
+\begin{answerbox}
+High bias (too simple) underfits; high variance (too flexible) overfits. Total error balances the two; we choose model capacity / regularization to minimize their sum.
+\end{answerbox}
+
+\end{enumerate}
+
+\begin{examtipbox}
+Claiming dropout is active at test time, or that L1 and L2 both produce sparsity (only L1 does).
+\end{examtipbox}
+
+% ==================================================
+\subsection{Convolutional Neural Networks}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Input is $32\times32$, kernel $5\times5$, stride $1$, no padding. Compute the output spatial size.
+\begin{answerbox}
+$O = \lfloor (32 - 5 + 0)/1 \rfloor + 1 = 28$. Output is $28\times28$.
+\end{answerbox}
+
+\q How many learnable parameters has a conv layer with $3\times3$ kernels, $16$ input channels, $32$ output channels (with bias)?
+\begin{answerbox}
+$(3\cdot3\cdot16 + 1)\cdot 32 = (144+1)\cdot32 = 4640$ parameters.
+\end{answerbox}
+
+\q Why do CNNs use parameter sharing and local connectivity?
+\begin{answerbox}
+A filter detects the same pattern anywhere in the image (translation equivariance) and connects only to a local region. This drastically reduces parameters versus a fully-connected layer and builds in a useful spatial prior.
+\end{answerbox}
+
+\q What is the difference between max pooling and average pooling, and why pool at all?
+\begin{answerbox}
+Max pooling keeps the strongest activation in a region (more invariance, keeps salient features); average pooling smooths. Both downsample to reduce spatial size and computation, with no learnable parameters.
+\end{answerbox}
+
+\end{enumerate}
+
+% ==================================================
+\subsection{Optimizers, Model Tuning, Benefits of Depth}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Briefly compare SGD, Momentum, RMSProp, and Adam.
+\begin{answerbox}
+SGD: plain gradient step. Momentum: accumulates a velocity to damp oscillations and speed up. RMSProp: scales the step per parameter by a running RMS of gradients. Adam: combines momentum + RMSProp with bias correction -- adaptive per-parameter learning rates.
+\end{answerbox}
+
+\q State Adam's default hyperparameters.
+\begin{answerbox}
+$\beta_1 = 0.9$, $\beta_2 = 0.999$, $\epsilon = 10^{-8}$, with a typical $\eta \approx 10^{-3}$.
+\end{answerbox}
+
+\q Why does momentum accelerate training?
+\begin{answerbox}
+It averages successive gradients, so consistent directions build up speed while oscillating components cancel, smoothing the path through ravines toward the minimum.
+\end{answerbox}
+
+\q Why can a deep network be preferable to a very wide shallow one?
+\begin{answerbox}
+Depth can represent certain functions exponentially more compactly and builds a hierarchy of reusable features (edges $\to$ parts $\to$ objects), generalizing better for the same parameter budget.
+\end{answerbox}
+
+\q Why must hyperparameters be tuned on the validation set, not the test set?
+\begin{answerbox}
+Tuning on the test set leaks information and gives an optimistic, biased estimate of generalization. The test set must stay untouched for a single final, honest evaluation.
+\end{answerbox}
+
+\end{enumerate}
+
+% ==================================================
+\subsection{Backpropagation}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Write the chain rule used to get $\partial \mathcal{L}/\partial \theta$ through one neuron ($z = \theta x$, $a = \sigma(z)$).
+\begin{answerbox}
+$\dfrac{\partial \mathcal{L}}{\partial \theta} = \dfrac{\partial \mathcal{L}}{\partial a}\,\dfrac{\partial a}{\partial z}\,\dfrac{\partial z}{\partial \theta} = \dfrac{\partial \mathcal{L}}{\partial a}\,\sigma'(z)\,x$.
+\end{answerbox}
+
+\q Why must the forward pass cache its activations?
+\begin{answerbox}
+The backward pass reuses those activations (and pre-activations) to compute local derivatives; recomputing them would be wasteful, so they are stored during the forward pass.
+\end{answerbox}
+
+\q Give the derivatives of the sigmoid and ReLU activations.
+\begin{answerbox}
+Sigmoid: $\sigma'(z) = \sigma(z)(1-\sigma(z))$. ReLU: $1$ if $z>0$, else $0$ (undefined at $0$, taken as $0$).
+\end{answerbox}
+
+\q For $a = \sigma(z)$, $z = wx+b$ with $w=2,\,x=1,\,b=0$ and loss $\mathcal{L} = \tfrac12(a-y)^2$, $y=0$, find $\partial\mathcal{L}/\partial w$. (Use $\sigma(2)\approx0.88$.)
+\begin{answerbox}
+$\partial\mathcal{L}/\partial a = a - y = 0.88$. $\sigma'(2)=0.88(1-0.88)\approx0.106$. $\partial z/\partial w = x = 1$. So $\partial\mathcal{L}/\partial w \approx 0.88 \cdot 0.106 \cdot 1 \approx 0.093$.
+\end{answerbox}
+
+\end{enumerate}
+
+\begin{examtipbox}
+Forgetting to multiply by the activation's derivative, or by the upstream gradient -- every link in the chain must be included.
+\end{examtipbox}
+
+% ==================================================
+\subsection{CNNs Part 2 -- Augmentation -- Deep Architectures}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q What is data augmentation and why does it help?
+\begin{answerbox}
+Label-preserving transformations (flip, crop, rotate, color jitter, Mixup, etc.) that enlarge the effective training set. It improves generalization and acts as regularization by exposing the model to plausible variations.
+\end{answerbox}
+
+\q What problem do residual (skip) connections solve, and how?
+\begin{answerbox}
+They mitigate vanishing gradients and degradation in very deep nets. The shortcut $y = \mathcal{F}(x)+x$ lets gradients flow directly and lets the block learn only a residual, so adding layers no longer hurts.
+\end{answerbox}
+
+\q Why does VGG stack several $3\times3$ convolutions instead of one large kernel?
+\begin{answerbox}
+Three stacked $3\times3$ convs have the receptive field of a $7\times7$ conv but with fewer parameters and more non-linearities (more representational power).
+\end{answerbox}
+
+\q Name three landmark CNN architectures and their key contribution.
+\begin{answerbox}
+AlexNet (ReLU + dropout + GPU training), VGG (deep uniform $3\times3$ stacks), ResNet (residual connections enabling 100+ layers). Also GoogLeNet/Inception (multi-scale modules).
+\end{answerbox}
+
+\end{enumerate}
+
+% ==================================================
+\subsection{Efficient Learning of DNNs}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Explain vanishing and exploding gradients and give mitigations.
+\begin{answerbox}
+Repeated multiplication of small/large Jacobians across layers shrinks/blows up gradients, stalling or destabilizing training. Mitigations: ReLU activations, good init (He/Xavier), BatchNorm, residual connections, and gradient clipping (for explosions).
+\end{answerbox}
+
+\q When would you use He initialization versus Xavier?
+\begin{answerbox}
+He init (variance $2/n_{in}$) with ReLU-type activations; Xavier/Glorot (variance $2/(n_{in}+n_{out})$) with tanh/sigmoid. Matching init to activation keeps signal/gradient variance stable across layers.
+\end{answerbox}
+
+\q How does batch normalization behave differently at training and test time?
+\begin{answerbox}
+Training: normalizes each activation using the current mini-batch mean/variance. Test: uses running (moving-average) statistics collected during training, so outputs are deterministic.
+\end{answerbox}
+
+\q Why does BatchNorm help training?
+\begin{answerbox}
+It stabilizes the distribution of layer inputs, smooths the loss landscape, allows higher learning rates and faster convergence, and provides mild regularization.
+\end{answerbox}
+
+\end{enumerate}
+
+% ==================================================
+\subsection{Frameworks and Hardware}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q What is the difference between dynamic and static computational graphs?
+\begin{answerbox}
+Dynamic (define-by-run, PyTorch): the graph is built on the fly each forward pass -- flexible, easy to debug. Static (classic TF): graph defined once then executed -- can be optimized/deployed but less flexible.
+\end{answerbox}
+
+\q What is reverse-mode automatic differentiation and why is it efficient for deep learning?
+\begin{answerbox}
+It computes gradients by propagating derivatives backward from the output (= backprop). It is efficient when there are few outputs and many inputs -- exactly the DL case (a scalar loss, millions of parameters).
+\end{answerbox}
+
+\q Why are GPUs well-suited to deep learning?
+\begin{answerbox}
+Training is dominated by large, parallel matrix multiplications; GPUs have thousands of cores and high memory bandwidth, giving huge throughput compared to CPUs.
+\end{answerbox}
+
+\q Distinguish data parallelism from model parallelism.
+\begin{answerbox}
+Data parallelism: replicate the model on each device, split the batch, average gradients. Model parallelism: split the model itself across devices -- used when the model is too large for one device.
+\end{answerbox}
+
+\end{enumerate}
+
+% ==================================================
+\subsection{Recurrent Neural Networks}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Write the hidden-state update of a vanilla RNN.
+\begin{answerbox}
+$h_t = \sigma(W_{hh}h_{t-1} + W_{xh}x_t + b)$, with output $\hat y_t = W_{hy}h_t$. Weights are shared across all time steps.
+\end{answerbox}
+
+\q What is backpropagation through time and what problem does it suffer from?
+\begin{answerbox}
+BPTT unrolls the RNN over time steps and backpropagates through the whole chain. Over long sequences gradients vanish or explode, making long-range dependencies hard to learn.
+\end{answerbox}
+
+\q How do LSTMs handle long-term dependencies?
+\begin{answerbox}
+A cell state $c_t$ carries information across time with mostly additive updates, controlled by input, forget, and output gates. The forget gate decides what to keep, allowing gradients to persist over long ranges.
+\end{answerbox}
+
+\q How does a GRU differ from an LSTM?
+\begin{answerbox}
+A GRU is lighter: it merges the cell and hidden state and uses two gates (update, reset) instead of three. Fewer parameters, often comparable performance.
+\end{answerbox}
+
+\q Give an example task for many-to-one and for many-to-many RNNs.
+\begin{answerbox}
+Many-to-one: sentiment classification of a sentence. Many-to-many: part-of-speech tagging (aligned) or machine translation (unaligned, via seq2seq).
+\end{answerbox}
+
+\end{enumerate}
+
+% ==================================================
+\subsection{Generative Models -- Word Embeddings}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Contrast CBOW and Skip-gram in Word2Vec.
+\begin{answerbox}
+CBOW predicts the center word from its surrounding context (faster, good for frequent words). Skip-gram predicts the context words from the center word (better for rare words and small corpora).
+\end{answerbox}
+
+\q Why is negative sampling used when training Word2Vec?
+\begin{answerbox}
+The full softmax over a huge vocabulary is too expensive. Negative sampling instead trains the model to distinguish the true context word from a few random "negative" words, making each update cheap.
+\end{answerbox}
+
+\q What is the difference between static and contextual word embeddings?
+\begin{answerbox}
+Static (Word2Vec, GloVe): one fixed vector per word regardless of context. Contextual (from Transformers like BERT): the vector depends on the surrounding sentence, capturing word sense.
+\end{answerbox}
+
+\q Explain the famous embedding analogy property.
+\begin{answerbox}
+Linear relationships emerge, e.g.\ $\text{vec(king)}-\text{vec(man)}+\text{vec(woman)}\approx\text{vec(queen)}$ -- directions in the space encode semantic relations like gender.
+\end{answerbox}
+
+\end{enumerate}
+
+% ==================================================
+\subsection{Non-Seq Architectures, Transfer Learning, Autoencoders, SSL}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q When would you use feature extraction versus fine-tuning in transfer learning?
+\begin{answerbox}
+Feature extraction (freeze the backbone, train a new head) when the target dataset is small or very similar to the source. Fine-tuning (unfreeze some/all layers with a small learning rate) when you have more data or a different domain.
+\end{answerbox}
+
+\q State the objective of a basic autoencoder and two uses.
+\begin{answerbox}
+Minimize reconstruction error $\|x - \mathrm{dec}(\mathrm{enc}(x))\|^2$ through a bottleneck latent code. Uses: dimensionality reduction, denoising, anomaly detection, unsupervised pretraining.
+\end{answerbox}
+
+\q What is self-supervised learning and what is a pretext task? Give an example.
+\begin{answerbox}
+SSL creates labels from the data itself (no human annotation) via a pretext task, then transfers the learned representation. Example: masked-token prediction, or predicting image rotation.
+\end{answerbox}
+
+\q Explain the idea behind contrastive learning.
+\begin{answerbox}
+Pull representations of two augmented views of the same sample together while pushing apart views of different samples, so the encoder learns invariant, discriminative features (e.g.\ SimCLR).
+\end{answerbox}
+
+\end{enumerate}
+
+% ==================================================
+\subsection{Seq2Seq -- Attention -- Transformers}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q What is the bottleneck in vanilla seq2seq, and how does attention solve it?
+\begin{answerbox}
+The whole input is squeezed into one fixed-size context vector, losing information for long sequences. Attention lets the decoder access all encoder states, weighting the relevant ones at each output step.
+\end{answerbox}
+
+\q Write scaled dot-product attention and explain the $\sqrt{d_k}$ term.
+\begin{answerbox}
+$\mathrm{Attention}(Q,K,V)=\mathrm{softmax}\!\big(QK^\top/\sqrt{d_k}\big)V$. Dividing by $\sqrt{d_k}$ keeps the dot products from growing large, which would push softmax into saturated regions with tiny gradients.
+\end{answerbox}
+
+\q Name the three uses of attention inside a Transformer.
+\begin{answerbox}
+Encoder self-attention (each input token attends to all input tokens), masked decoder self-attention (each output token attends only to earlier outputs), and encoder--decoder cross-attention (decoder attends to encoder outputs).
+\end{answerbox}
+
+\q Why do Transformers need positional encodings?
+\begin{answerbox}
+Self-attention is permutation-invariant -- it has no inherent notion of order. Positional encodings inject position information so the model can use sequence order.
+\end{answerbox}
+
+\q Give two advantages of Transformers over RNNs.
+\begin{answerbox}
+They process all positions in parallel (RNNs are sequential), and they capture long-range dependencies directly via attention rather than through a decaying hidden state. This makes them faster to train and more scalable.
+\end{answerbox}
+
+\end{enumerate}
+
+% ==================================================
+\subsection{Generative Models -- VAE, GAN, Diffusion}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q Name the two terms of the VAE objective (ELBO) and what each does.
+\begin{answerbox}
+A reconstruction term $\mathbb{E}_{q(z|x)}[\log p(x|z)]$ (decode $z$ back to $x$) and a KL regularizer $D_{KL}(q(z|x)\,\|\,p(z))$ that keeps the latent posterior close to the prior $\mathcal{N}(0,I)$.
+\end{answerbox}
+
+\q What is the reparameterization trick and why is it needed?
+\begin{answerbox}
+Write $z=\mu+\sigma\odot\epsilon$ with $\epsilon\sim\mathcal{N}(0,I)$. It moves the randomness out of the computation path so gradients can flow through $\mu,\sigma$ -- you cannot backprop through a raw sampling operation.
+\end{answerbox}
+
+\q Write the GAN minimax objective and explain mode collapse.
+\begin{answerbox}
+$\min_G\max_D \mathbb{E}_x[\log D(x)] + \mathbb{E}_z[\log(1-D(G(z)))]$. Mode collapse: the generator produces only a few outputs that fool $D$, ignoring the diversity of the real data.
+\end{answerbox}
+
+\q Compare VAEs, GANs, and diffusion models on sample quality, stability, and speed.
+\begin{answerbox}
+VAE: stable training, principled latent space, but blurrier samples. GAN: sharp samples, unstable training, prone to mode collapse. Diffusion: highest quality and stable, but slow sampling (many denoising steps).
+\end{answerbox}
+
+\end{enumerate}
+
+\newpage
+% ==================================================
+\subsection{Mock Exam (Questions Only)}
+% ==================================================
+
+\begin{importantbox}
+Suggested time: 90 minutes. Total: 60 marks. Attempt all questions. Answers are in the chapters above.
+\end{importantbox}
+
+\begin{enumerate}[leftmargin=*,label=\textbf{\arabic*.}]
+    \item Derive the gradients of the loss with respect to the weights of a two-layer MLP using backpropagation. \hfill\textbf{[12]}
+    \item A conv layer receives a $64\times64\times3$ input and applies $32$ filters of size $5\times5$, stride $2$, padding $2$. Give the output shape and the number of parameters. \hfill\textbf{[8]}
+    \item Compare SGD with momentum, RMSProp, and Adam. State when each is preferred. \hfill\textbf{[8]}
+    \item Explain vanishing/exploding gradients and three techniques that address them. \hfill\textbf{[6]}
+    \item Describe the LSTM gating mechanism and how it preserves long-term memory. \hfill\textbf{[6]}
+    \item Define scaled dot-product attention, justify the $\sqrt{d_k}$ scaling, and explain self-attention. \hfill\textbf{[8]}
+    \item Contrast VAEs, GANs, and diffusion models; explain the reparameterization trick. \hfill\textbf{[8]}
+    \item Define overfitting and discuss four regularization strategies. \hfill\textbf{[4]}
+\end{enumerate}
+
+
+\end{document}

@@ -1,0 +1,681 @@
+\documentclass[10pt,a4paper]{article}
+
+% ==================================================
+% FTP_DeLearn – Deep Learning Summary Template
+% Team: Tobias, Almira, Isha
+% ==================================================
+
+\usepackage[margin=1.5cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{tcolorbox}
+\usepackage{multicol}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{parskip}
+\usepackage{microtype}
+\usepackage[T1]{fontenc}
+\IfFileExists{lmodern.sty}{\usepackage{lmodern}}{} % use Latin Modern if available
+
+\hypersetup{
+	colorlinks=true,
+	linkcolor=MidnightBlue,
+	urlcolor=MidnightBlue
+}
+
+% ---------- Custom Boxes ----------
+
+\newtcolorbox{definitionbox}{
+	colback=blue!5,
+	colframe=blue!60!black,
+	title=Definition
+}
+
+\newtcolorbox{formulabox}{
+	colback=green!5,
+	colframe=green!50!black,
+	title=Key Formula
+}
+
+\newtcolorbox{examtipbox}{
+	colback=yellow!10,
+	colframe=orange!70!black,
+	title=Exam Tip
+}
+
+\newtcolorbox{importantbox}{
+	colback=red!5,
+	colframe=red!60!black,
+	title=Important
+}
+
+% ---------- Metadata ----------
+
+\title{\textbf{FTP\_DeLearn}\\Deep Learning Exam Summary}
+\author{Tobias \and Almira \and Isha}
+\date{\today}
+
+\begin{document}
+	
+	\maketitle
+	\tableofcontents
+	\newpage
+	
+	% ==================================================
+	\section{Introduction to Deep Learning}
+	% ==================================================
+	
+	\begin{definitionbox}
+		Deep Learning is a subset of Machine Learning based on multi-layer neural networks that learn hierarchical feature representations directly from data.
+	\end{definitionbox}
+	
+	\subsection{Machine Learning vs Deep Learning}
+	
+	\subsection{Machine Learning Definition}
+	
+	\subsection{Deep Learning Definition}
+	
+	
+	% ==================================================
+	\section{Numpy and Tensors Basics}
+	% ==================================================
+	
+	\subsection{Core Concepts}
+	
+	\begin{definitionbox}
+		\textbf{AI $\supset$ ML $\supset$ DL.} Classical ML relies on hand-crafted features; deep learning \emph{learns} the features. Performance typically scales with data and model size.
+	\end{definitionbox}
+	
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Representation learning}: each layer transforms the input into a more abstract representation.
+		\item \textbf{End-to-end learning}: from raw input to output, no manual feature engineering.
+		\item Why now: large datasets, GPUs, better optimization \& initialization.
+	\end{itemize}
+	
+	\subsection{Tensors}
+	
+	\begin{definitionbox}
+		A \textbf{tensor} is an $n$-dimensional array, the basic data structure of deep learning.
+	\end{definitionbox}
+	
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Rank & Name & Example shape \\
+			\midrule
+			0 & Scalar & \texttt{()} \\
+			1 & Vector & \texttt{(d,)} \\
+			2 & Matrix & \texttt{(m, n)} \\
+			3 & 3-tensor & \texttt{(c, h, w)} image \\
+			4 & 4-tensor & \texttt{(b, c, h, w)} batch \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	
+	\textbf{Key operations}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Reshape / view}: change shape, keep number of elements.
+		\item \textbf{Broadcasting}: align trailing dimensions; size-1 dims are stretched.
+		\item \textbf{Element-wise} ops vs.\ \textbf{matrix multiplication} (\texttt{@}).
+		\item \textbf{Axis / dim reductions}: sum, mean, max over a chosen axis.
+	\end{itemize}
+	
+	\subsection{Important Formula}
+	
+	\begin{formulabox}
+		\[
+		(A B)_{ij} = \sum_{k} A_{ik} B_{kj}, \qquad A \in \mathbb{R}^{m\times k},\; B \in \mathbb{R}^{k\times n}
+		\]
+	\end{formulabox}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		Inner dimensions must match for matrix multiplication. Be able to compute output shapes after reshape/broadcast/matmul. Convention: batch dimension is first (\texttt{(b, \dots)}).
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{Learning and Optimisation}
+	% ==================================================
+	
+	\subsection{Core Concepts}
+	
+	\begin{definitionbox}
+		\textbf{Supervised learning}: given pairs $(x_i, y_i)$, learn parameters $\theta$ of a model $f(x;\theta)$ that minimize the expected loss. We approximate this by \textbf{empirical risk minimization} (ERM).
+	\end{definitionbox}
+	
+	\begin{formulabox}
+		\[
+		J(\theta) = \frac{1}{N}\sum_{i=1}^{N} \mathcal{L}\big(f(x_i;\theta),\, y_i\big)
+		\]
+	\end{formulabox}
+	
+	\subsection{Common Loss Functions}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{MSE} (regression): $\tfrac{1}{N}\sum (\hat y_i - y_i)^2$
+		\item \textbf{Cross-entropy} (classification): $-\sum_c y_c \log \hat y_c$
+		\item \textbf{Binary cross-entropy}: $-[y\log\hat y + (1-y)\log(1-\hat y)]$
+	\end{itemize}
+	
+	\subsection{Gradient Descent}
+	
+	\begin{formulabox}
+		\[
+		\theta_{t+1} = \theta_t - \eta\, \nabla_\theta J(\theta_t)
+		\]
+	\end{formulabox}
+	
+	\textbf{Variants}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Batch GD}: full dataset per step -- stable, slow.
+		\item \textbf{SGD}: one sample per step -- noisy, fast, can escape minima.
+		\item \textbf{Mini-batch GD}: batch of size $B$ -- standard choice.
+	\end{itemize}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		Cross-entropy pairs with softmax; MSE pairs with linear output. The learning rate $\eta$ is the most important hyperparameter: too large diverges, too small is slow. Always split data into train / validation / test.
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{MLP, Overfitting, Regularisation}
+	% ==================================================
+	
+	\subsection{Multi-Layer Perceptron}
+	
+	\begin{definitionbox}
+		An \textbf{MLP} stacks fully-connected layers with non-linear activations. With $\geq 1$ hidden layer and a non-linearity it is a \textbf{universal approximator}.
+	\end{definitionbox}
+	
+	\begin{formulabox}
+		\[
+		h^{(l)} = \sigma\!\big(W^{(l)} h^{(l-1)} + b^{(l)}\big), \qquad h^{(0)} = x
+		\]
+	\end{formulabox}
+	
+	\subsection{Artificial Neuron}
+	
+	\begin{formulabox}
+		\[
+		z = w^\top x + b, \qquad a = \sigma(z)
+		\]
+	\end{formulabox}
+	
+	\subsection{Activation Functions}
+	\begin{multicols}{2}
+		\begin{itemize}[leftmargin=*]
+			\item Sigmoid: $\frac{1}{1+e^{-z}}$
+			\item Tanh: zero-centered
+			\item ReLU: $\max(0,z)$
+			\item Leaky ReLU: fixes dying ReLU
+			\item Softmax: probabilities over classes
+		\end{itemize}
+	\end{multicols}
+	
+	\subsection{Overfitting vs.\ Underfitting}
+	
+	\begin{importantbox}
+		\begin{itemize}[leftmargin=*]
+			\item \textbf{Underfitting}: high bias -- model too simple, poor on train \& test.
+			\item \textbf{Overfitting}: high variance -- low train error, high test error.
+			\item \textbf{Bias--variance trade-off}: total error balances the two.
+		\end{itemize}
+	\end{importantbox}
+	
+	\subsection{Regularisation}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{L2 (weight decay)}: $J + \lambda\|w\|_2^2$ -- shrinks weights.
+		\item \textbf{L1}: $J + \lambda\|w\|_1$ -- promotes sparsity.
+		\item \textbf{Dropout}: randomly zero activations with prob.\ $p$ at train time.
+		\item \textbf{Early stopping}: halt when validation loss rises.
+		\item \textbf{Data augmentation}: synthetic transformations of inputs.
+	\end{itemize}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		Dropout is only active during training; at test time activations are scaled (or weights scaled by $p$). Increasing $\lambda$ increases bias, reduces variance. Know how to read a train/validation loss curve to diagnose over/underfitting.
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{Convolutional Neural Networks}
+	% ==================================================
+	
+	\subsection{Core Concepts}
+	
+	\begin{definitionbox}
+		A \textbf{CNN} applies learnable filters (kernels) that slide over the input, exploiting \textbf{local connectivity} and \textbf{parameter sharing} -- ideal for grid-like data (images).
+	\end{definitionbox}
+	
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Filter / kernel}: small weight matrix convolved across the input.
+		\item \textbf{Feature map}: output of one filter.
+		\item \textbf{Stride}: step size of the filter.
+		\item \textbf{Padding}: zeros around the border (\emph{same} vs.\ \emph{valid}).
+		\item \textbf{Receptive field}: input region that influences one output.
+	\end{itemize}
+	
+	\subsection{Output Size}
+	
+	\begin{formulabox}
+		\[
+		O = \left\lfloor \frac{W - K + 2P}{S} \right\rfloor + 1
+		\]
+		\small $W$: input size, $K$: kernel, $P$: padding, $S$: stride.
+	\end{formulabox}
+	
+	\subsection{Pooling}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Max pooling}: keeps the strongest activation -- adds invariance.
+		\item \textbf{Average pooling}: averages a region.
+		\item Reduces spatial size, no learnable parameters.
+	\end{itemize}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		A conv layer's parameter count is $(K \cdot K \cdot C_{in} + 1)\cdot C_{out}$ -- independent of input spatial size. Be ready to compute feature-map sizes through a stack of layers. Parameter sharing is why CNNs have far fewer weights than an equivalent MLP.
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{Optimizers, Model Tuning, Benefits of Depth}
+	% ==================================================
+	
+	\subsection{Optimizers}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{SGD}: $\theta \leftarrow \theta - \eta g$
+		\item \textbf{Momentum}: accumulate velocity to smooth updates.
+		\item \textbf{RMSProp}: divide by running RMS of gradients.
+		\item \textbf{Adam}: momentum + RMSProp (adaptive per-parameter rates).
+	\end{itemize}
+	
+	\begin{formulabox}
+		\textbf{Adam} (bias-corrected):
+		\[
+		m_t = \beta_1 m_{t-1} + (1-\beta_1) g_t, \quad
+		v_t = \beta_2 v_{t-1} + (1-\beta_2) g_t^2
+		\]
+		\[
+		\hat m_t = \frac{m_t}{1-\beta_1^t}, \;\;
+		\hat v_t = \frac{v_t}{1-\beta_2^t}, \;\;
+		\theta_{t+1} = \theta_t - \eta \frac{\hat m_t}{\sqrt{\hat v_t}+\epsilon}
+		\]
+	\end{formulabox}
+	
+	\subsection{Model Tuning}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Learning-rate schedules}: step decay, cosine, warmup.
+		\item \textbf{Hyperparameter search}: grid, random, Bayesian.
+		\item \textbf{Tune on the validation set}, never the test set.
+	\end{itemize}
+	
+	\subsection{Benefits of Depth}
+	
+	\begin{importantbox}
+		Deep networks can represent certain functions \emph{exponentially} more compactly than shallow ones. Depth builds a hierarchy of features (edges $\to$ textures $\to$ parts $\to$ objects).
+	\end{importantbox}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		Adam defaults: $\beta_1=0.9$, $\beta_2=0.999$, $\epsilon=10^{-8}$. Adam converges fast but SGD+momentum often generalizes better. Random search beats grid search when only a few hyperparameters matter.
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{Backpropagation}
+	% ==================================================
+	
+	\subsection{Core Concepts}
+	
+	\begin{definitionbox}
+		\textbf{Backpropagation} computes the gradient of the loss w.r.t.\ every parameter by applying the \textbf{chain rule} backward through the computational graph -- one efficient backward pass reuses intermediate values.
+	\end{definitionbox}
+	
+	\begin{formulabox}
+		\textbf{Chain rule:}
+		\[
+		\frac{\partial \mathcal{L}}{\partial \theta}
+		= \frac{\partial \mathcal{L}}{\partial a}\,
+		\frac{\partial a}{\partial z}\,
+		\frac{\partial z}{\partial \theta}
+		\]
+	\end{formulabox}
+	
+	\subsection{Forward \& Backward Pass}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Forward}: compute layer outputs and the loss, cache activations.
+		\item \textbf{Backward}: propagate the error signal $\delta$ from output to input.
+		\item Per layer: $\delta^{(l)} = (W^{(l+1)\top}\delta^{(l+1)}) \odot \sigma'(z^{(l)})$.
+		\item Gradients: $\nabla_{W^{(l)}} = \delta^{(l)} (h^{(l-1)})^\top$, \;\; $\nabla_{b^{(l)}} = \delta^{(l)}$.
+	\end{itemize}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		The forward pass must cache activations because they are reused in the backward pass. A common exam task: hand-compute gradients for a tiny 2-layer network. Watch the derivative of the activation: $\sigma'(z)=\sigma(z)(1-\sigma(z))$, ReLU$'=\mathbb{1}[z>0]$.
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{CNNs Part 2 -- Data Augmentation -- Deep Architectures}
+	% ==================================================
+	
+	\subsection{Data Augmentation}
+	
+	\begin{definitionbox}
+		Artificially enlarging the training set with label-preserving transformations to improve generalization and act as regularization.
+	\end{definitionbox}
+	
+	\begin{itemize}[leftmargin=*]
+		\item Geometric: flip, rotate, crop, scale, translate.
+		\item Photometric: brightness, contrast, color jitter, noise.
+		\item Advanced: Cutout, Mixup, CutMix, RandAugment.
+	\end{itemize}
+	
+	\subsection{Classic Architectures}
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Model & Key idea & Year \\
+			\midrule
+			LeNet-5 & First successful CNN (digits) & 1998 \\
+			AlexNet & ReLU + dropout + GPUs & 2012 \\
+			VGG & Deep stacks of $3\times3$ convs & 2014 \\
+			GoogLeNet & Inception modules & 2014 \\
+			ResNet & Residual / skip connections & 2015 \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	
+	\subsection{Residual Connections}
+	
+	\begin{formulabox}
+		\[
+		y = \mathcal{F}(x, \{W_i\}) + x
+		\]
+	\end{formulabox}
+	
+	\begin{importantbox}
+		Skip connections let gradients flow directly, enabling very deep networks (100+ layers) by mitigating vanishing gradients. The network only needs to learn the \emph{residual}.
+	\end{importantbox}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		$3\times3$ convs stacked give the same receptive field as one large conv but with fewer parameters and more non-linearity (VGG insight). ResNet's identity shortcut is why depth stopped hurting accuracy.
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{Efficient Learning of DNNs}
+	% ==================================================
+	
+	\subsection{Vanishing \& Exploding Gradients}
+	
+	\begin{importantbox}
+		In deep nets, repeated multiplication of small (or large) Jacobians causes gradients to vanish (or explode), stalling or destabilizing training. Saturating activations (sigmoid/tanh) worsen vanishing gradients.
+	\end{importantbox}
+	
+	\subsection{Weight Initialization}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Xavier/Glorot} (tanh/sigmoid): $\mathrm{Var}(w)=\frac{2}{n_{in}+n_{out}}$
+		\item \textbf{He} (ReLU): $\mathrm{Var}(w)=\frac{2}{n_{in}}$
+	\end{itemize}
+	
+	\subsection{Batch Normalization}
+	
+	\begin{definitionbox}
+		\textbf{BatchNorm} normalizes layer inputs per mini-batch, then rescales with learnable $\gamma,\beta$. Speeds up and stabilizes training, allows higher learning rates, mild regularization.
+	\end{definitionbox}
+	
+	\begin{formulabox}
+		\[
+		\hat x = \frac{x - \mu_B}{\sqrt{\sigma_B^2 + \epsilon}}, \qquad
+		y = \gamma \hat x + \beta
+		\]
+	\end{formulabox}
+	
+	\textbf{Other norms}: Layer, Group, Instance normalization.
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		Use He init with ReLU, Xavier with tanh. BatchNorm uses batch statistics at train time but running averages at test time. ReLU + good init + BatchNorm together largely solve vanishing gradients.
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{Deep Learning Frameworks and Hardware Considerations}
+	% ==================================================
+	
+	\subsection{Frameworks}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{PyTorch}: dynamic (define-by-run) graphs, Pythonic, research-favored.
+		\item \textbf{TensorFlow/Keras}: static \& eager modes, strong deployment.
+		\item \textbf{Autograd}: automatic differentiation builds the graph and computes gradients via reverse-mode AD (= backprop).
+	\end{itemize}
+	
+	\subsection{Hardware}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{CPU}: few powerful cores; flexible, low throughput.
+		\item \textbf{GPU}: thousands of cores; massively parallel matrix ops.
+		\item \textbf{TPU}: specialized matrix-multiply accelerators.
+		\item \textbf{Mixed precision} (FP16/BF16): faster, less memory.
+		\item \textbf{Parallelism}: data parallel (split batch) vs.\ model parallel (split model).
+	\end{itemize}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		Reverse-mode autodiff is efficient when outputs $\ll$ inputs (scalar loss, many params) -- exactly the DL setting. GPUs win because training is dominated by large matrix multiplications. Bigger batches use the hardware better but may hurt generalization.
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{Recurrent Neural Networks}
+	% ==================================================
+	
+	\subsection{Core Concepts}
+	
+	\begin{definitionbox}
+		An \textbf{RNN} processes sequences by maintaining a hidden state $h_t$ that summarizes past inputs. Weights are \textbf{shared across time steps}.
+	\end{definitionbox}
+	
+	\begin{formulabox}
+		\[
+		h_t = \sigma\!\big(W_{hh} h_{t-1} + W_{xh} x_t + b\big), \qquad
+		\hat y_t = W_{hy} h_t
+		\]
+	\end{formulabox}
+	
+	\subsection{Training: BPTT}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Backprop Through Time}: unroll the network and backprop over steps.
+		\item Suffers from vanishing/exploding gradients over long sequences.
+		\item \textbf{Gradient clipping} controls exploding gradients.
+	\end{itemize}
+	
+	\subsection{Gated Units}
+	
+	\begin{importantbox}
+		\textbf{LSTM} adds a cell state $c_t$ with input, forget, and output gates -- lets information persist over long ranges. \textbf{GRU} is a lighter variant with update \& reset gates.
+	\end{importantbox}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		The forget gate is the key to LSTM's long-memory ability. RNNs are sequential -> hard to parallelize over time (a motivation for Transformers). Know the difference: many-to-one (classification), many-to-many (tagging/translation).
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{Generative Models -- Word Embeddings}
+	% ==================================================
+	
+	\subsection{Word Embeddings}
+	
+	\begin{definitionbox}
+		A \textbf{word embedding} maps each word to a dense low-dimensional vector so that semantically similar words are close. Learned from co-occurrence in large corpora.
+	\end{definitionbox}
+	
+	\subsection{Word2Vec}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{CBOW}: predict the center word from its context.
+		\item \textbf{Skip-gram}: predict context words from the center word.
+		\item \textbf{Negative sampling} makes training tractable.
+	\end{itemize}
+	
+	\subsection{GloVe}
+	\begin{itemize}[leftmargin=*]
+		\item Factorizes the global word co-occurrence matrix.
+		\item Combines count-based and prediction-based ideas.
+	\end{itemize}
+	
+	\begin{formulabox}
+		Famous analogy property:
+		\[
+		\mathrm{vec}(\text{king}) - \mathrm{vec}(\text{man}) + \mathrm{vec}(\text{woman}) \approx \mathrm{vec}(\text{queen})
+		\]
+	\end{formulabox}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		Embeddings are \emph{static} (one vector per word) -- contrast with contextual embeddings from Transformers. The embedding matrix is just a learnable lookup table of shape (vocab $\times$ dim).
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{Non-Seq Architectures, Transfer Learning, Autoencoders, SSL}
+	% ==================================================
+	
+	\subsection{Transfer Learning}
+	
+	\begin{definitionbox}
+		Reuse a model pre-trained on a large source task; \textbf{fine-tune} it on a smaller target task. Saves data and compute.
+	\end{definitionbox}
+	
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Feature extraction}: freeze backbone, train a new head.
+		\item \textbf{Fine-tuning}: unfreeze some/all layers with a small learning rate.
+	\end{itemize}
+	
+	\subsection{Autoencoders}
+	
+	\begin{formulabox}
+		\[
+		z = \mathrm{enc}(x), \qquad \hat x = \mathrm{dec}(z), \qquad
+		\mathcal{L} = \|x - \hat x\|^2
+		\]
+	\end{formulabox}
+	
+	\begin{itemize}[leftmargin=*]
+		\item Learn a compressed latent code $z$ (bottleneck).
+		\item Variants: denoising, sparse, contractive autoencoders.
+		\item Uses: dimensionality reduction, anomaly detection, pretraining.
+	\end{itemize}
+	
+	\subsection{Self-Supervised Learning}
+	
+	\begin{importantbox}
+		\textbf{SSL} creates supervision from the data itself via \emph{pretext tasks} (no human labels), then transfers the learned representation. Examples: masked prediction, \textbf{contrastive learning} (SimCLR), pulling augmented views of the same image together and pushing others apart.
+	\end{importantbox}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		Transfer learning shines with little target data. Autoencoders are unsupervised reconstruction; SSL uses pretext tasks to learn general features. Contrastive losses need negatives (or tricks like BYOL to avoid them).
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{Seq2Seq -- Attention -- Transformers}
+	% ==================================================
+	
+	\subsection{Seq2Seq}
+	
+	\begin{definitionbox}
+		An \textbf{encoder--decoder} maps an input sequence to an output sequence. The encoder summarizes the input; the decoder generates the output token by token.
+	\end{definitionbox}
+	
+	The fixed-size context vector is a bottleneck for long sequences -- solved by \textbf{attention}.
+	
+	\subsection{Attention}
+	
+	\begin{formulabox}
+		\textbf{Scaled dot-product attention:}
+		\[
+		\mathrm{Attention}(Q,K,V) = \mathrm{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
+		\]
+	\end{formulabox}
+	
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Q, K, V}: queries, keys, values.
+		\item Attention weights = similarity between a query and all keys.
+		\item Lets the decoder look at all encoder states, not just the last.
+	\end{itemize}
+	
+	\subsection{Transformers}
+	
+	\begin{importantbox}
+		The \textbf{Transformer} replaces recurrence with \textbf{self-attention}, so all positions are processed in parallel. Key parts: multi-head attention, positional encodings, feed-forward layers, residual + LayerNorm.
+	\end{importantbox}
+	
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Self-attention}: each token attends to all tokens in the same sequence.
+		\item \textbf{Multi-head}: several attention heads capture different relations.
+		\item \textbf{Positional encoding}: injects order (attention is permutation-invariant).
+	\end{itemize}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		The $\sqrt{d_k}$ scaling keeps softmax gradients stable. Transformers parallelize over the sequence (unlike RNNs) -- a major reason they scale. Know the three attention types: encoder self-attn, masked decoder self-attn, encoder--decoder cross-attn.
+	\end{examtipbox}
+	
+	% ==================================================
+	\section{Generative Models -- VAE, GAN, Diffusion}
+	% ==================================================
+	
+	\subsection{Variational Autoencoder (VAE)}
+	
+	\begin{definitionbox}
+		A \textbf{VAE} learns a probabilistic latent space: the encoder outputs a distribution $q(z|x)$, the decoder reconstructs $x$ from sampled $z$. Trained by maximizing the \textbf{ELBO}.
+	\end{definitionbox}
+	
+	\begin{formulabox}
+		\[
+		\mathcal{L}_{\text{VAE}} =
+		\underbrace{\mathbb{E}_{q(z|x)}[\log p(x|z)]}_{\text{reconstruction}}
+		- \underbrace{D_{KL}\big(q(z|x)\,\|\,p(z)\big)}_{\text{regularizer}}
+		\]
+	\end{formulabox}
+	
+	The \textbf{reparameterization trick} ($z = \mu + \sigma \odot \epsilon$, $\epsilon\sim\mathcal{N}(0,I)$) makes sampling differentiable.
+	
+	\subsection{Generative Adversarial Network (GAN)}
+	
+	\begin{formulabox}
+		\textbf{Minimax objective:}
+		\[
+		\min_G \max_D \;
+		\mathbb{E}_{x}[\log D(x)] + \mathbb{E}_{z}[\log(1 - D(G(z)))]
+		\]
+	\end{formulabox}
+	
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Generator} $G$: turns noise into fake samples.
+		\item \textbf{Discriminator} $D$: distinguishes real from fake.
+		\item Issues: training instability, \textbf{mode collapse}.
+	\end{itemize}
+	
+	\subsection{Diffusion Models}
+	
+	\begin{importantbox}
+		\textbf{Diffusion} gradually adds Gaussian noise to data (\emph{forward} process), then trains a network to \emph{reverse} it -- denoising step by step to generate samples. State of the art for image generation (e.g.\ Stable Diffusion).
+	\end{importantbox}
+	
+	\subsection{Exam Tips}
+	
+	\begin{examtipbox}
+		VAE: blurry but stable, principled latent space. GAN: sharp samples, unstable training, mode collapse. Diffusion: high quality, slow sampling (many steps). Remember the reparameterization trick is what lets VAEs backprop through sampling.
+	\end{examtipbox}
+	
+		
+\end{document}

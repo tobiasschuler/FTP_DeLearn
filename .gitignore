@@ -1,0 +1,112 @@
+# ---------------------------------------------
+# LaTeX build artifacts
+# ---------------------------------------------
+
+## Core auxiliary files
+*.aux
+*.lof
+*.log
+*.lot
+*.fls
+*.out
+*.toc
+*.fmt
+*.fot
+*.cb
+*.cb2
+.*.lb
+
+## Intermediate documents
+*.dvi
+*.xdv
+*-converted-to.*
+
+## Generated PDF
+*.pdf
+
+## Bibliography
+*.bbl
+*.bcf
+*.blg
+*-blx.aux
+*-blx.bib
+*.run.xml
+*.fdb_latexmk
+*.synctex
+*.synctex(busy)
+*.synctex.gz
+*.synctex.gz(busy)
+*.pdfsync
+
+## hyperref
+*.brf
+
+## glossaries / nomenclature
+*.glg
+*.glo
+*.gls
+*.glsdefs
+*.acn
+*.acr
+*.alg
+*.nlg
+*.nlo
+*.nls
+
+## index
+*.idx
+*.ilg
+*.ind
+*.ist
+
+## listings
+*.lol
+
+## todonotes
+*.tdo
+
+## xcolor / tcolorbox
+*.spl
+
+## algorithms
+*.alg
+*.loa
+
+## minted (if used)
+_minted*/
+*.pyg
+
+## beamer (if used)
+*.nav
+*.snm
+*.vrb
+
+## latexmk
+*.fdb_latexmk
+*.fls
+
+## auto folder (some editors)
+auto/
+**/auto/
+
+# ---------------------------------------------
+# Editor / OS files
+# ---------------------------------------------
+
+## TeXShop / TeXworks
+*.tps
+
+## VS Code (LaTeX Workshop)
+.vscode/
+
+## macOS
+.DS_Store
+
+## Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+## Linux
+*~
+.*.swp
