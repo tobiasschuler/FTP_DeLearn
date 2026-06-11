@@ -1413,9 +1413,429 @@ lang_upsampled = resample(lang_names, replace=True,    # WITH replacement
 	% ==================================================
 	\section{Generative Models -- Word Embeddings}
 	% ==================================================
-	
+
+	\subsection{Generative Systems}
+
+	\begin{definitionbox}
+		A \textbf{generative system} generates new \emph{consistent} data from a seed. \textbf{Consistent} = respecting the temporal or spatial \textbf{structures} learned from the input space.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item Deals with \textbf{sequential data}, related to:
+		\begin{itemize}[leftmargin=*]
+			\item \textbf{Space} -- image
+			\item \textbf{Time} -- speech, music
+			\item \textbf{Sequence of symbols} -- text, DNA
+		\end{itemize}
+	\end{itemize}
+
+	\subsection{Generating Sequential Data with RNNs}
+
+	Generate one element at a time, feeding the prediction back as the next input (\textbf{autoregressive}). Two training schemes:
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Many-to-one}: read a sequence, output a single next element. To generate, append the prediction to the input and repeat (sliding window).
+		\item \textbf{Many-to-many (shifted)}: target is the input sequence shifted by one; the net predicts the next element at \emph{every} timestep. More efficient -- one loss per step, full \textbf{teacher forcing} during training.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{Shifted} = target$_t$ = input$_{t+1}$. The output sequence is the input delayed by one step.
+	\end{importantbox}
+
+	\begin{examtipbox}
+		Likely: \emph{``how do you generate a sequence with an RNN?''} $\rightarrow$ autoregressive loop, sample $\rightarrow$ feed back. Know the difference: many-to-one gives one prediction per pass; many-to-many (shifted) supervises every timestep and trains faster via teacher forcing.
+	\end{examtipbox}
+
+	\subsection{Char-level Many-to-one with RNNs}
+
+	\begin{definitionbox}
+		Train the RNN to \textbf{predict the next character} in a many-to-one setting. At test time, an initial sequence (\textbf{seed}) is fed in and the next char is \textbf{sampled} from the softmax posterior. The output is appended to the seed and the process repeats (autoregressive).
+	\end{definitionbox}
+
+	\textbf{Pipeline} (operating at character level):
+	\begin{enumerate}[leftmargin=*]
+		\item \textbf{Encoding}: each char $\rightarrow$ \textbf{one-hot} vector with a $1$ at its position in the alphabet of size $D$ (e.g.\ \texttt{\{a,b,c,\dots,A,B,C,\dots,-,",\_,END\}}).
+		\item \textbf{RNN}: feed $x_0,\dots,x_t$ through the recurrent cells; the last hidden state feeds a \textbf{softmax} over the $D$ symbols.
+		\item \textbf{Sampling}: randomly pick the winner char \emph{respecting} the output distribution (not argmax).
+		\item \textbf{Decoding}: map the chosen one-hot back to a character.
+	\end{enumerate}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		font=\small,
+		cell/.style={draw, fill=green!18, minimum size=8mm},
+		op/.style={draw, fill=orange!20, minimum width=7mm, minimum height=7mm, align=center},
+		sm/.style={draw, fill=green!18, minimum width=10mm, minimum height=6mm},
+		>=stealth, node distance=10mm
+	]
+		% input chars
+		\node (c0) at (0,0) {\texttt{d}};
+		\node (c1) at (1.6,0) {\texttt{e}};
+		\node (c2) at (3.2,0) {\texttt{e}};
+		\node (c3) at (4.8,0) {\texttt{p}};
+		% encoding bar
+		\node[op, fill=orange!20, minimum width=5.2cm] (enc) at (2.4,0.9) {encoding (one-hot)};
+		% rnn cells
+		\node[cell] (a0) at (0,2.2) {$A$};
+		\node[cell] (a1) at (1.6,2.2) {$A$};
+		\node[cell] (a2) at (3.2,2.2) {$A$};
+		\node[cell] (a3) at (4.8,2.2) {$A$};
+		\draw[->] (a0)--(a1); \draw[->] (a1)--(a2); \draw[->] (a2)--(a3);
+		\foreach \i in {0,1,2,3} { \draw[->] (enc.north -| a\i) -- (a\i.south); }
+		\foreach \i in {0,1,2,3} { \draw[->] (c\i) -- (enc.south -| c\i); }
+		% softmax + sampling + decoding
+		\node[sm] (soft) at (6.7,2.2) {softmax};
+		\node[op, minimum height=9mm] (samp) at (8.2,2.2) {samp-\\ling};
+		\node[op, minimum height=9mm] (dec) at (9.7,2.2) {deco-\\ding};
+		\node (out) at (11,2.2) {\texttt{e}};
+		\draw[->] (a3)--(soft);
+		\draw[->,dashed] (soft)--(samp);
+		\draw[->,dashed] (samp)--(dec);
+		\draw[->,dashed] (dec)--(out);
+	\end{tikzpicture}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Sample, don't argmax.} In generative mode we sample from the softmax probabilities $\Rightarrow$ \textbf{variability} in the output for similar inputs. Pure argmax would be deterministic and repetitive.
+	\end{importantbox}
+
+	\begin{examtipbox}
+		Be able to describe the full pipeline: char $\rightarrow$ one-hot ($D$ = alphabet size) $\rightarrow$ RNN $\rightarrow$ softmax $\rightarrow$ \textbf{sample} $\rightarrow$ decode. Common question: \emph{``why sample instead of taking the most likely char?''} $\rightarrow$ to introduce diversity / avoid deterministic loops.
+	\end{examtipbox}
+
+	\subsection{Many-to-one in Keras (+ Parameter Counting)}
+
+	Same architecture as name classification; here the output is $D=65$ chars (\texttt{num\_char}).
+
+	\begin{verbatim}
+model = keras.models.Sequential()
+model.add(keras.layers.InputLayer(shape=(sentence_length, num_chars)))
+model.add(keras.layers.SimpleRNN(256, return_sequences=False))
+model.add(keras.layers.Dense(num_chars))
+model.add(keras.layers.Activation('softmax'))
+model.compile(loss='categorical_crossentropy', optimizer='adam',
+              metrics=['accuracy'])
+	\end{verbatim}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{InputLayer} \texttt{shape}: (\texttt{sentence\_length}, \texttt{num\_chars}) -- sequence length $\times$ element dim.
+		\item \textbf{SimpleRNN} \texttt{units}: hidden-state size (here 256).
+		\item \texttt{return\_sequences=False}: return \emph{only} the last hidden state (many-to-one), not the full sequence.
+		\item \textbf{Dense + softmax}: classify the last state over the $D$ chars.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tabular}{@{}llr@{}}
+		\toprule
+		Layer & Output shape & Param \# \\
+		\midrule
+		\texttt{simple\_rnn} (SimpleRNN) & (None, 256) & 82\,432 \\
+		\texttt{dense} (Dense) & (None, 65) & 16\,705 \\
+		\texttt{activation} (softmax) & (None, 65) & 0 \\
+		\midrule
+		\multicolumn{2}{@{}l}{\textbf{Total}} & \textbf{99\,137} \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{formulabox}
+		\textbf{SimpleRNN} with $h$ units, input dim $D$:
+		\[
+		\#\text{params} = \underbrace{h\cdot h}_{W_h} + \underbrace{h\cdot D}_{W_x} + \underbrace{h}_{b_h} = h\,(h + D + 1)
+		\]
+		\[
+		256\cdot256 + 256\cdot65 + 256 = 65536 + 16640 + 256 = 82\,432
+		\]
+		\textbf{Dense} with $D$ outputs from $h$ inputs:
+		\[
+		\#\text{params} = h\cdot D + D = 256\cdot65 + 65 = 16\,705
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $h$: hidden units (256) \quad $D$: alphabet / num chars (65)
+		\item $W_h$: recurrent (state$\to$state) weights \quad $W_x$: input weights \quad $b_h$: hidden bias
+	\end{itemize}
+
+	\begin{examtipbox}
+		Classic \textbf{derive} question: ``how many parameters in this RNN?'' Don't forget the \textbf{recurrent} term $h\cdot h$ and the \textbf{bias} $h$ -- the most common mistakes. Full formula: $h(h+D+1)$ for SimpleRNN, $h\,D+D$ for the Dense head.
+	\end{examtipbox}
+
+	\subsection{Building the Vocabulary}
+
+	Get the sorted set of unique chars, then two lookup dicts for encoding/decoding:
+
+	\begin{verbatim}
+chars = sorted(list(set(corpus)))          # 65 unique chars
+num_chars = len(chars)
+encoding = {c: i for i, c in enumerate(chars)}   # char -> int
+decoding = {i: c for i, c in enumerate(chars)}   # int  -> char
+	\end{verbatim}
+
+	\begin{itemize}[leftmargin=*]
+		\item \texttt{encoding}: char $\rightarrow$ integer index (used before one-hot).
+		\item \texttt{decoding}: integer index $\rightarrow$ char (used after sampling).
+		\item \texttt{num\_chars} $= D = 65$ = alphabet size = one-hot / softmax dimension.
+	\end{itemize}
+
+	\subsection{Preparing Inputs and Outputs}
+
+	Slice the corpus into overlapping ``sentences'' with a \textbf{sliding window}: each $X$ is \texttt{sentence\_length} chars, the target $y$ is the \emph{next} char.
+
+	\begin{verbatim}
+sentence_length = 20      # input sequence length
+skip = 1                  # stride between windows
+for i in range(0, len(corpus) - sentence_length, skip):
+    sentence  = corpus[i : i + sentence_length]   # 20 chars
+    next_char = corpus[i + sentence_length]       # 21st char = target
+    X_data.append([encoding[c] for c in sentence])
+    y_data.append(encoding[next_char])
+	\end{verbatim}
+
+	\begin{itemize}[leftmargin=*]
+		\item \texttt{sentence\_length}: window length (20). \quad \texttt{skip}: stride over the corpus.
+		\item $\approx \texttt{len(corpus)}/\texttt{skip}$ overlapping windows (here 1\,115\,374).
+		\item Each char stored as its \textbf{integer index} (from \texttt{encoding}); one-hot done later.
+		\item Example: $X[0]=[18,47,56,\dots]\to$ \texttt{['F','i','r','s','t',\dots]}, \; $y[0]\to$ \texttt{'e'}.
+	\end{itemize}
+
+	\begin{importantbox}
+		\texttt{skip} controls overlap/dataset size: \texttt{skip=1} = max overlap (most samples); larger \texttt{skip} = fewer, less-redundant windows. Window is the \textbf{context}; target is always the single following char (many-to-one).
+	\end{importantbox}
+
+	\subsection{Vectorising to One-hot}
+
+	Turn the integer indices into \textbf{one-hot} tensors (boolean) for $X$ and $y$:
+
+	\begin{verbatim}
+X = np.zeros((num_sentences, sentence_length, num_chars), dtype=bool)
+y = np.zeros((num_sentences, num_chars), dtype=bool)
+for i, sentence in enumerate(X_data):
+    for t, encoded_char in enumerate(sentence):
+        X[i, t, encoded_char] = 1     # set the one-hot bit
+    y[i, y_data[i]] = 1
+	\end{verbatim}
+
+	\begin{importantbox}
+		\textbf{Tensor shapes} (sanity check):
+		\[
+		X:\ (\underbrace{1\,115\,374}_{\text{\#sentences}},\ \underbrace{20}_{\text{seq len}},\ \underbrace{65}_{\text{chars}}) \qquad
+		y:\ (1\,115\,374,\ 65)
+		\]
+		$X$ is 3-D (one-hot per timestep); $y$ is 2-D (one one-hot target per sentence, many-to-one).
+	\end{importantbox}
+
+	\begin{examtipbox}
+		Know the \textbf{shapes}: input $(N,\,L,\,D)$ = (samples, sequence length, vocab); many-to-one target $(N,\,D)$. Always \textbf{sanity-check tensor dimensions} before training. \texttt{dtype=bool} saves memory since one-hot is just 0/1.
+	\end{examtipbox}
+
+	\subsection{Many-to-many Approach}
+
+	\begin{definitionbox}
+		In \textbf{many-to-many}, the RNN emits an output $y_t$ at \emph{every} timestep; a per-step loss $L_t$ is computed and the total loss sums over all steps. Contrast with many-to-one (single output/loss at the last step).
+	\end{definitionbox}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		font=\small, >=stealth,
+		h/.style={draw, fill=green!18, minimum size=6mm},
+		f/.style={draw, fill=gray!22, minimum size=6mm},
+		inp/.style={draw, fill=red!15, minimum size=6mm},
+		outp/.style={draw, fill=blue!12, minimum size=6mm},
+		l/.style={draw, fill=violet!15, minimum size=6mm}
+	]
+		% hidden chain
+		\foreach \i/\xpos in {0/0,1/2,2/4,3/6} { \node[h] (h\i) at (\xpos,0) {$h_{\i}$}; }
+		\node[h] (hT) at (8,0) {$h_T$};
+		\foreach \i/\xpos in {1/1,2/3,3/5} { \node[f] (f\i) at (\xpos,0) {$f_W$}; }
+		\draw[->] (h0)--(f1); \draw[->] (f1)--(h1); \draw[->] (h1)--(f2);
+		\draw[->] (f2)--(h2); \draw[->] (h2)--(f3); \draw[->] (f3)--(h3);
+		\draw[->,dashed] (h3)--(hT);
+		% inputs
+		\foreach \i/\xpos in {1/1,2/3,3/5} { \node[inp] (x\i) at (\xpos,-1.4) {$x_{\i}$}; \draw[->] (x\i)--(f\i); }
+		% per-step outputs + losses
+		\foreach \i/\xpos in {1/1,2/3,3/5} {
+			\node[outp] (y\i) at (\xpos,1.4) {$y_{\i}$};
+			\node[l] (L\i) at (\xpos+0.9,1.4) {$L_{\i}$};
+			\draw[->] (h\i)--(y\i); \draw[->] (y\i)--(L\i);
+		}
+		\node[outp] (yT) at (8,1.4) {$y_T$};
+		\node[l] (LT) at (8.9,1.4) {$L_T$};
+		\draw[->] (hT)--(yT); \draw[->] (yT)--(LT);
+		% total loss
+		\node[l, fill=violet!25, minimum width=12mm] (tot) at (4.5,2.9) {Loss};
+		\foreach \i in {1,2,3} { \draw[->] (L\i)--(tot); }
+		\draw[->] (LT)--(tot);
+	\end{tikzpicture}
+	\end{center}
+
+	\begin{itemize}[leftmargin=*]
+		\item Difference is mainly at \textbf{training time}: cells emit an output at \emph{each} step.
+		\item \textbf{Loss = sum over all step outputs} (vs.\ 1 output in many-to-one).
+		\item Output layer is \textbf{``time distributed''} -- same Dense+softmax applied to every timestep.
+		\item Shared weights $W$ ($f_W$) across all steps -- identical to many-to-one.
+	\end{itemize}
+
+	\begin{examtipbox}
+		\textbf{Compare} many-to-one vs many-to-many: same recurrence/weights, but many-to-many supervises \emph{every} step (richer gradient signal, faster training via teacher forcing) and needs a \textbf{TimeDistributed} output layer. Many-to-one only uses the last hidden state.
+	\end{examtipbox}
+
+	\subsection{Output Distribution Through Time \& Truncated BPTT}
+
+	\begin{definitionbox}
+		The many-to-many approach needs a \textbf{distribution of the output through time} and a \textbf{truncated back-propagation through time}.
+	\end{definitionbox}
+
+	\textbf{1. ``A distribution of the output through time''}
+	\begin{itemize}[leftmargin=*]
+		\item This is the \textbf{TimeDistributed} output layer: the same Dense + softmax head is applied at each of the $L$ steps -- the output layer is \emph{distributed across time}.
+		\item Each timestep produces its own \textbf{probability distribution} (softmax over the $D$ chars); the loss is \textbf{summed over all per-step distributions}.
+		\item I.e.\ \emph{one softmax output per timestep}, not just one at the end.
+	\end{itemize}
+
+	\textbf{2. ``A truncated back-propagation through time'' (TBPTT)}
+	\begin{itemize}[leftmargin=*]
+		\item Training an RNN = \textbf{unroll} it and backpropagate the loss through every timestep = \textbf{Backpropagation Through Time (BPTT)}.
+		\item For long sequences BPTT is:
+		\begin{itemize}[leftmargin=*]
+			\item \textbf{expensive} -- must store all activations for the whole sequence;
+			\item \textbf{unstable} -- gradients vanish/explode over many steps.
+		\end{itemize}
+		\item \textbf{Truncated BPTT}: process the sequence in \textbf{chunks} and let the gradient flow back only a \textbf{limited number of steps} $k$, not through the whole sequence.
+		\item Hidden state is still \textbf{carried forward} across chunks (forward pass keeps long context), but the \textbf{gradient is cut off} after $k$ steps.
+		\item Many-to-many produces a loss at \emph{every} step $\Rightarrow$ per-chunk truncated training is natural.
+	\end{itemize}
+
+	\begin{examtipbox}
+		Two things many-to-many needs: \textbf{(a)} a per-timestep softmax output (TimeDistributed); \textbf{(b)} \textbf{truncated} BPTT -- gradients trained step-by-step but only backpropagated a bounded distance $k$ to keep training tractable and stable. Know why we truncate: cost + vanishing/exploding gradients.
+	\end{examtipbox}
+
+	\subsection{Many-to-many in Keras}
+
+	Two changes vs many-to-one: \texttt{return\_sequences=True} and wrap Dense in \texttt{TimeDistributed}.
+
+	\begin{verbatim}
+model.add(keras.layers.InputLayer(shape=(sentence_length, num_chars)))
+model.add(keras.layers.SimpleRNN(256, return_sequences=True))
+model.add(keras.layers.TimeDistributed(
+              keras.layers.Dense(num_chars, activation='softmax')))
+	\end{verbatim}
+
+	\begin{itemize}[leftmargin=*]
+		\item \texttt{return\_sequences=True}: emit an output at \emph{every} step (not just the last).
+		\item \texttt{TimeDistributed(Dense)}: apply the \emph{same} Dense+softmax to each timestep.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tabular}{@{}llr@{}}
+		\toprule
+		Layer & Output shape & Param \# \\
+		\midrule
+		\texttt{simple\_rnn} & (None, 100, 256) & 82\,432 \\
+		\texttt{time\_distributed} (Dense) & (None, 100, 65) & 16\,705 \\
+		\midrule
+		\multicolumn{2}{@{}l}{\textbf{Total}} & \textbf{99\,137} \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Same parameter count as many-to-one (99\,137)!} Weights are \textbf{shared across time}, so adding a time dimension changes the \emph{output shapes} (gain a length axis: \texttt{(None,\,100,\,$\cdot$)}) but \textbf{not} the number of parameters.
+	\end{importantbox}
+
+	\begin{examtipbox}
+		Trap question: ``does many-to-many have more parameters?'' $\rightarrow$ \textbf{No} -- weight sharing means identical params; only the output shape grows a time axis. Remember the two code changes: \texttt{return\_sequences=True} + \texttt{TimeDistributed}.
+	\end{examtipbox}
+
+	\begin{importantbox}
+		\textbf{Finding -- faster convergence:} many-to-many reaches a \textbf{better loss in fewer epochs} than many-to-one. Reasonable, since training supervises \emph{every} step of the recurrence (more gradient signal per sequence) -- same parameters, richer training.
+	\end{importantbox}
+
+	\subsection{Data Prep for Many-to-many ($y$ is shifted)}
+
+	Now $y$ is a \textbf{sequence}, not a single char: take 20 chars \textbf{shifted by 1} as target.
+
+	\begin{verbatim}
+for i in range(0, len(corpus) - sentence_length, skip):
+    sentence  = corpus[i : i + sentence_length]          # 20 chars
+    next_char = corpus[i+1 : i+1 + sentence_length]      # 20 chars, shifted +1
+    X_data.append([encoding[c] for c in sentence])
+    y_data.append([encoding[c] for c in next_char])
+# y one-hot loop now mirrors X (3-D):
+for i, sentence in enumerate(y_data):
+    for t, encoded_char in enumerate(sentence):
+        y[i, t, encoded_char] = 1
+	\end{verbatim}
+
+	\begin{itemize}[leftmargin=*]
+		\item \texttt{next\_char} = \texttt{corpus[i+1 : i+1+sentence\_length]} -- input shifted by one.
+		\item Example: $X=$ \texttt{['F','i','r','s','t',\dots]}, \; $y=$ \texttt{['i','r','s','t',' ',\dots]}.
+		\item $y$ is now the same shape as $X$: $(1\,115\,374,\ 20,\ 65)$ -- a one-hot \emph{per timestep}.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{Many-to-one vs many-to-many target:} many-to-one $y$ = single next char, shape $(N,D)$. Many-to-many $y$ = next-char-at-every-step (input shifted $+1$), shape $(N,L,D)$ = same as $X$.
+	\end{importantbox}
+
+	\subsection{Generating Text (Inference Loop)}
+
+	One-hot the \textbf{seed}, then loop: predict $\rightarrow$ sample $\rightarrow$ append $\rightarrow$ slide window.
+
+	\begin{verbatim}
+X = np.zeros((1, sentence_length, num_chars), dtype=float)
+for i, character in enumerate(seed_pattern):
+    X[0, i, encoding[character]] = 1        # one-hot the seed
+
+generated_text = ""
+for i in range(500):
+    output_prob = model.predict(X, verbose=0)[0][-1]   # last step, drop batch
+    prediction  = np.random.choice(num_chars, p=output_prob)  # sample
+    generated_text += decoding[prediction]
+    activations = np.zeros((1, 1, num_chars), dtype=bool)
+    activations[0, 0, prediction] = 1
+    # drop first char, glue predicted one
+    X = np.concatenate((X[:, 1:, :], activations), axis=1)
+print(generated_text)
+	\end{verbatim}
+
+	\begin{itemize}[leftmargin=*]
+		\item \texttt{predict(X)} returns shape $(1, 20, 65)$ = (batch, step, char-probs).
+		\item \texttt{[0][-1]}: drop the batch dim and take the \textbf{last} step $\rightarrow$ vector of size 65.
+		\item \texttt{np.random.choice(..., p=output\_prob)}: \textbf{sample} the winner char (not argmax).
+		\item \texttt{concatenate((X[:,1:,:], activations))}: shift window -- drop oldest char, append new one.
+	\end{itemize}
+
+	\begin{importantbox}
+		The window is \textbf{slid} each step: input keeps a fixed length \texttt{sentence\_length}, dropping the first char and appending the freshly generated one (autoregressive feedback). Sampling (not argmax) gives output variability.
+	\end{importantbox}
+
+	\begin{examtipbox}
+		Be able to explain the \textbf{generation loop}: seed $\rightarrow$ predict $\rightarrow$ sample from softmax $\rightarrow$ decode $\rightarrow$ shift window $\rightarrow$ repeat. Know why \texttt{[0][-1]} (last-step prediction, no batch) and why \texttt{np.random.choice} over \texttt{argmax} (diversity).
+	\end{examtipbox}
+
+	\subsection{What to Expect \& How to Evaluate}
+
+	\textbf{What can we expect out of the RNN?}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Make sense?} Locally yes (plausible short fragments), but \textbf{long-range coherence is weak} -- it captures statistical structure, not meaning.
+		\item \textbf{Valid words?} Mostly -- a char-level RNN learns spelling and word boundaries -- but it can still emit \textbf{non-words} and ungrammatical sequences.
+	\end{itemize}
+
+	\textbf{How can we evaluate a generator?}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{At training time}: next-token prediction \textbf{accuracy} (also loss / perplexity).
+		\item \textbf{At testing time}: \textbf{benchmarks} and reference-based metrics like \textbf{BLEU} (precision of $n$-gram overlap, translation) and \textbf{ROUGE} (recall of $n$-gram overlap, summarization).
+	\end{itemize}
+
+	\begin{importantbox}
+		Training accuracy measures next-char prediction, \emph{not} the quality of full generated sequences -- a model can have high training accuracy yet produce incoherent text. Generation quality needs test-time metrics.
+	\end{importantbox}
+
+	\begin{examtipbox}
+		Know the split: \textbf{train time} $\rightarrow$ accuracy/perplexity; \textbf{test time} $\rightarrow$ BLEU/ROUGE/benchmarks. Be ready to say \textbf{BLEU = precision-oriented} (translation), \textbf{ROUGE = recall-oriented} (summarization), and that no metric fully captures ``meaning''.
+	\end{examtipbox}
+
 	\subsection{Word Embeddings}
-	
+
 	\begin{definitionbox}
 		A \textbf{word embedding} maps each word to a dense low-dimensional vector so that semantically similar words are close. Learned from co-occurrence in large corpora.
 	\end{definitionbox}
