@@ -653,6 +653,83 @@ SimpleRNN $=(\text{input\_dim}+\text{units})\cdot\text{units}+\text{units} = (\t
 Problems: vanishing/exploding gradients over long sequences (can't learn long-range dependencies) and slow sequential training. Worse in RNNs because the \emph{same} recurrent weight is multiplied repeatedly through time, so its powers shrink or blow up; worse in SimpleRNNs than LSTMs because they lack gated, additive state updates. \textbf{LSTM/GRU} add a gated cell state with additive updates (forget/input/output, or update/reset gates) so gradients persist. Other aids: gradient clipping, good init, attention/Transformers. \textbf{Regularisation}: add \texttt{dropout}/\texttt{recurrent\_dropout} in the RNN layer and/or L2 on the weights, plus a Dropout layer before the Dense head.
 \end{answerbox}
 
+\q Different \emph{types of task} that RNNs can address, with one example application each.
+\begin{answerbox}
+Classified by the input/output cardinality (sequence length need not match the input length):
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Type} & \textbf{Mapping} & \textbf{Example application} \\
+\midrule
+One-to-many  & 1 input $\to$ sequence      & Image captioning (image $\to$ caption) \\
+Many-to-one  & sequence $\to$ 1 output     & Sentiment / sequence classification \\
+Many-to-many (aligned) & sequence $\to$ sequence (same length) & POS tagging, named-entity recognition \\
+Many-to-many (seq2seq) & sequence $\to$ sequence (diff.\ length) & Machine translation, speech recognition \\
+\bottomrule
+\end{tabular}
+\end{center}
+(\textbf{One-to-one} is the degenerate non-recurrent case, e.g.\ plain image classification.) The shared point: a recurrent hidden state carries context across time, so the network handles variable-length, order-dependent data.
+\end{answerbox}
+
+\q Number of trainable parameters of a \textbf{two-layer Elman RNN + softmax}: hidden dims $32$ and $64$, $10$ softmax classes, sequences of length $100$, each element a vector of dimension $30$.
+\begin{answerbox}
+Sequence length ($100$) is \emph{irrelevant} -- weights are shared across time. Per Elman layer with input dim $d$, hidden dim $h$: $W_{xh}(h{\times}d)+W_{hh}(h{\times}h)+b(h)=h(d+h+1)$.
+\[
+\begin{aligned}
+\text{Layer 1 } (d{=}30,\,h{=}32):\;& 32(30+32+1)=32\cdot 63 = 2016\\
+\text{Layer 2 } (d{=}32,\,h{=}64):\;& 64(32+64+1)=64\cdot 97 = 6208\\
+\text{Softmax } (64\to 10):\;& 64\cdot 10 + 10 = 650\\
+\hline
+\textbf{Total}:\;& 2016+6208+650 = \mathbf{8874}
+\end{aligned}
+\]
+The second layer's input dim is the first layer's hidden dim ($32$), not the raw input dim ($30$).
+\end{answerbox}
+
+\q Same as above but a \textbf{two-layer LSTM + softmax} (hidden dims $32,64$; $10$ classes; length $100$; element dim $30$).
+\begin{answerbox}
+An LSTM has \textbf{4 gate sets} (input, forget, cell-candidate, output), each with its own $W_{xh},W_{hh},b$, so a layer costs $4\,h(d+h+1)$ -- exactly $4\times$ the Elman count.
+\[
+\begin{aligned}
+\text{Layer 1}:\;& 4\cdot 2016 = 8064\\
+\text{Layer 2}:\;& 4\cdot 6208 = 24832\\
+\text{Softmax}:\;& 650\\
+\hline
+\textbf{Total}:\;& 8064+24832+650 = \mathbf{33546}
+\end{aligned}
+\]
+\end{answerbox}
+
+\q Why is gradient clipping needed for \textbf{long} rather than short sentences/texts?
+\begin{answerbox}
+BPTT multiplies gradients through every time step, so the contribution of an early step scales like (recurrent-Jacobian)$^{\,T}$ with $T=$ sequence length. If the spectral norm $>1$ this grows \textbf{exponentially in $T$} $\Rightarrow$ exploding gradients and unstable, NaN-prone updates. Short sequences have few factors, so the product stays bounded and clipping rarely triggers; only long sequences accumulate enough multiplications to blow up. Clipping caps the gradient norm, keeping the update direction but bounding its size.
+\end{answerbox}
+
+\q Why do Elman networks struggle to learn \textbf{long-term dependencies}?
+\begin{answerbox}
+\textbf{Vanishing gradients.} In BPTT the gradient w.r.t.\ a distant state is a product of many Jacobians $\prod W_{hh}^\top \mathrm{diag}(\phi')$. With a saturating activation (tanh, $\phi'\le 1$) and $\|W_{hh}\|<1$, this product shrinks exponentially with the time gap, so signal from far-back inputs reaches the update with negligible magnitude -- the net effectively can't tie a late output to an early input. (If $\|W_{hh}\|>1$ it instead explodes.) The single multiplicative hidden state has no path to carry information unchanged over many steps.
+\end{answerbox}
+
+\q In what situations would LSTMs, \emph{by design}, beat Elman networks?
+\begin{answerbox}
+Whenever the task needs \textbf{long-range memory}. The LSTM's cell state has \textbf{additive} updates gated by forget/input/output gates (a ``constant error carousel''), so gradients flow across many steps without vanishing, and the gates let it selectively keep or discard information. So LSTMs win on long sequences/documents, dependencies spanning many time steps, or when the relevant context appeared far in the past. For short sequences with only local dependencies, an Elman net does about as well with fewer parameters.
+\end{answerbox}
+
+\q How could you apply \textbf{conv layers} to a time-series forecasting task, and what must you watch out for?
+\begin{answerbox}
+Use \textbf{1D convolutions} sliding a kernel along the \emph{time} axis, with the feature/variable channels as input channels (multivariate $\to$ multiple $C_{\text{in}}$). Stack layers or use \textbf{dilated} convolutions (TCN/WaveNet) to enlarge the receptive field cheaply. Watch out for:
+\begin{itemize}[leftmargin=*,nosep]
+  \item \textbf{Causality}: use \emph{causal} (left-only) padding so the output at $t$ uses only $t$ and earlier -- ``same'' padding leaks future values (data leakage).
+  \item \textbf{Receptive field} must cover the relevant past horizon (kernel size, depth, dilation).
+  \item No leakage in the windowing / train--val--test split; scale-normalise inputs.
+\end{itemize}
+\end{answerbox}
+
+\q Difference between a \texttt{Conv1d} with kernel size $w$ and a \texttt{Conv2d} with kernel size $(w,1)$?
+\begin{answerbox}
+\textbf{Numerically the same operation.} \texttt{Conv1d}$(w)$ on input $(N,C,L)$ slides a length-$w$ window along $L$ and sums over all $C$ channels (weights $C_{\text{out}}{\times}C_{\text{in}}{\times}w$). \texttt{Conv2d}$(w,1)$ on $(N,C,H,W)$ slides $w$ along $H$, $1$ (pointwise) along $W$ (weights $C_{\text{out}}{\times}C_{\text{in}}{\times}w{\times}1$). If you reshape the 1D signal to $(N,C,L,1)$, the two produce \emph{identical} results -- \texttt{Conv2d}$(w,1)$ is just \texttt{Conv1d}$(w)$ carrying a dummy singleton axis. Difference is only bookkeeping/overhead; prefer \texttt{Conv1d} for genuine 1D data. \textbf{Caution:} don't confuse with \texttt{Conv2d}$(w,\text{features})$, which treats features as a spatial axis instead of channels.
+\end{answerbox}
+
 \end{enumerate}
 
 % --------------------------------------------------

@@ -16,6 +16,8 @@
 \usepackage{hyperref}
 \usepackage{parskip}
 \usepackage{microtype}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc,fit,backgrounds,shapes.geometric}
 \usepackage[T1]{fontenc}
 \IfFileExists{lmodern.sty}{\usepackage{lmodern}}{} % use Latin Modern if available
 
@@ -471,14 +473,71 @@
 	\end{examtipbox}
 	
 	% ==================================================
-	\section{Recurrent Neural Networks}
+But	\section{Recurrent Neural Networks}
 	% ==================================================
-	
+
+	\subsection{Motivation: Which Architecture for Which Data?}
+
+	\begin{definitionbox}
+		Architectures encode a \textbf{prior} about how features relate. The right choice depends on whether features have a notion of \textbf{locality} or \textbf{sequential order}.
+	\end{definitionbox}
+
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Model & Best for & Notion of locality \\
+			\midrule
+			MLP & Arbitrary feature combinations & Ignores it -- flexible but inefficient \\
+			CNN & Local features (incl.\ 1D, e.g.\ audio) & Exploits spatial/temporal locality \\
+			RNN & Sequential data & Recurrence over time steps \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{CNN}: succeeds when features have \textbf{locality}; works on 1D data (audio) as well as 2D images.
+		\item \textbf{MLP}: combines arbitrary features but is inefficient when features are related by locality (no weight sharing).
+		\item \textbf{RNN}: designed for \textbf{sequential} data -- new elements are generated recurrently from a hidden state fed by previous outputs and new input.
+	\end{itemize}
+
+	\subsection{Properties of Sequence Models}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Account for order}: elements are \emph{not} independent; sequential order matters. Must capture \textbf{local} and possibly \textbf{long-term} dependencies.
+		\item \textbf{Parameter sharing}: the same parameters are reused across positions (like CNNs) -- efficient, and allows modelling sequences of \textbf{arbitrary length}.
+		\item \textbf{Variable length}: handle inputs of differing length; in practice a fixed max length is set for training with \textbf{padding} (at least per batch).
+	\end{itemize}
+
 	\subsection{Core Concepts}
 	
 	\begin{definitionbox}
 		An \textbf{RNN} processes sequences by maintaining a hidden state $h_t$ that summarizes past inputs. Weights are \textbf{shared across time steps}.
 	\end{definitionbox}
+
+	\begin{formulabox}
+		\textbf{General recurrent update:}
+		\[
+		h_t = f(h_{t-1}, x_t)
+		\]
+		The cell $A$ computes the new state from the previous state $h_{t-1}$ and the current input $x_t$ via a non-linear function $f$ (same $f$ at every step).
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $x_t$: input element at step $t$ (tensor-valued).
+		\item $h_t$: hidden state at step $t$ (tensor-valued); also the output.
+		\item $f$: non-linear update, parameters shared across all $t$.
+	\end{itemize}
+
+	\begin{center}
+		\begin{tikzpicture}[>={Stealth[round]}, node distance=9mm]
+			\node[circle, draw, fill=blue!25] (x) {$x_t$};
+			\node[draw, fill=green!20, minimum width=11mm, minimum height=8mm, above=of x] (A) {$A$};
+			\node[circle, draw, fill=violet!25, above=of A] (h) {$h_t$};
+			\node[left=of A] (hp) {$h_{t-1}$};
+			\draw[->] (x) -- (A);
+			\draw[->] (hp) -- (A);
+			\draw[->] (A) -- (h);
+		\end{tikzpicture}
+	\end{center}
 	
 	\begin{formulabox}
 		\[
@@ -487,23 +546,868 @@
 		\]
 	\end{formulabox}
 	
+	\subsection{Elman Network (Vanilla RNN)}
+
+	\begin{definitionbox}
+		The \textbf{Elman network} is the simplest RNN: the hidden state is an \textbf{affine transform} of the current input and previous state, passed through a \textbf{non-linearity} (typically $\tanh$).
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\[
+		h_t = f\big(W_{xh}\, x_t + W_{hh}\, h_{t-1} + b_h\big), \qquad f(z) = \tanh(z)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $x_t$: input at step $t$, shape $n_x$; \quad $h_t$: hidden state, shape $n_h$.
+		\item $W_{xh}$: input$\to$hidden weights, shape $n_h \times n_x$ (slide: $W_x$).
+		\item $W_{hh}$: hidden$\to$hidden weights, shape $n_h \times n_h$ (slide: $W_h$).
+		\item $b_h$: bias, shape $n_h$; \quad $f$: non-linear activation.
+		\item Parameters $W_{xh}, W_{hh}, b_h$ are \textbf{shared across all steps}.
+	\end{itemize}
+
+	\begin{importantbox}
+		Forward propagation = \textbf{affine transformation of the inputs} (as in an MLP) followed by a \textbf{non-linear activation}. The recurrence is the only new ingredient versus an MLP.
+	\end{importantbox}
+
+	\subsection{Single-Layer RNN (Unrolled)}
+
+	\begin{center}
+		\begin{tikzpicture}[
+			>={Stealth[round]},
+			cell/.style={draw, fill=green!20, minimum width=10mm, minimum height=8mm},
+			inp/.style={circle, draw, fill=blue!25, minimum size=7mm, inner sep=0pt},
+			hid/.style={circle, draw, fill=violet!25, minimum size=7mm, inner sep=0pt}]
+			\node[cell] (A0) {$A$};
+			\node[cell, right=14mm of A0] (A1) {$A$};
+			\node[cell, right=14mm of A1] (A2) {$A$};
+			\node[cell, right=22mm of A2] (At) {$A$};
+			\foreach \i in {0,1,2,t} {
+				\node[inp, below=9mm of A\i] (x\i) {$x_{\i}$};
+				\node[hid, above=9mm of A\i] (h\i) {$h_{\i}$};
+				\draw[->] (x\i) -- (A\i);
+				\draw[->] (A\i) -- (h\i);
+			}
+			\node[left=12mm of A0] (init) {$h_{-1}$};
+			\draw[->] (init) -- node[above, font=\scriptsize] {init} (A0);
+			\draw[->] (A0) -- node[above, font=\scriptsize] {$h_0$} (A1);
+			\draw[->] (A1) -- node[above, font=\scriptsize] {$h_1$} (A2);
+			\draw[->] (A2) -- (At);
+			\node at ($(A2)!0.5!(At)$) {$\cdots$};
+			\node at ($(x2)!0.5!(xt)$) {$\cdots$};
+		\end{tikzpicture}
+	\end{center}
+
+	\begin{itemize}[leftmargin=*]
+		\item Updated through a \textbf{succession of steps}; each applies $h_t = f(h_{t-1}, x_t)$.
+		\item \textbf{Same function $f$} at every step $\Rightarrow$ parameters shared across time.
+		\item The state can \textbf{memorise} information from earlier in the sequence.
+		\item State is passed to the next cell (step $t{+}1$) or up to \textbf{another layer}.
+		\item State is \textbf{initialised} before the first step (often zeros), denoted $h_{-1}$.
+	\end{itemize}
+
+	\subsection{Sequence Model Categories}
+
+	\begin{definitionbox}
+		Sequence models are categorised by the \textbf{length of input vs.\ output} sequence.
+	\end{definitionbox}
+
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Category & In $\to$ Out & Example \\
+			\midrule
+			one-to-many & $1 \to n$ & Image captioning (image $\to$ words) \\
+			many-to-one & $n \to 1$ & Sentiment classification (words $\to$ label) \\
+			many-to-many (aligned, 1:1) & $n \to n$ & Named-entity recognition (word $\to$ class) \\
+			many-to-many (unaligned) & $n \to m$ & Translation, speech recognition, chatbots \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		The two many-to-many types differ: \textbf{aligned} produces one output per input step (same length, 1:1) -- e.g.\ NER. \textbf{Unaligned} has input and output of \emph{different} lengths and needs an \textbf{encoder--decoder (seq2seq)} -- e.g.\ translation.
+	\end{importantbox}
+
+	
+	\subsection{Implementation in PyTorch (\texttt{torch.nn.RNN})}
+
+\begin{verbatim}
+rnn = torch.nn.RNN(input_size, hidden_size, batch_first=True)
+# x : (batch, steps, input_size)   input includes ALL steps
+# h0: (batch, 1, hidden_size)      optional, default = zeros
+output, hn = rnn(x, h0)
+# output: (batch, steps, hidden_size)   hidden state of EVERY step
+# hn    : (batch, 1, hidden_size)       hidden state of LAST step only
+\end{verbatim}
+
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Tensor & Shape & Example \\
+			\midrule
+			\texttt{x} (input) & (batch, steps, input\_size) & (1, 5, 10) \\
+			\texttt{h0} (init) & (batch, 1, hidden\_size) & (1, 1, 20) \\
+			\texttt{output} (all) & (batch, steps, hidden\_size) & (1, 5, 20) \\
+			\texttt{hn} (last) & (batch, 1, hidden\_size) & (1, 1, 20) \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		\begin{itemize}[leftmargin=*]
+			\item \texttt{output} = hidden state of \textbf{all} cells; \texttt{hn} = hidden state of the \textbf{last} cell only.
+			\item The input tensor carries an \textbf{extra axis for the steps}; \texttt{h0} mirrors it with a length-1 step axis.
+			\item \texttt{batch\_first=True} puts the batch dimension first: \texttt{(batch, steps, $\cdot$)}.
+		\end{itemize}
+	\end{importantbox}
+
+	\textbf{Manual loop (equivalent to the one-go call):}
+
+\begin{verbatim}
+ht = h0[:,0,:]                       # drop step axis -> (batch, hidden)
+output1 = torch.zeros(steps, 1, hidden_size)
+for t in range(steps):
+    xt = x[:,t,:]                    # t-th input, shape (1, 10)
+    out, ht = rnn(xt, ht)            # ht shape (1, 20): step axis collapsed
+    output1[t] = out
+# identical to rnn(x, h0) up to numerical precision (max diff ~1e-7)
+\end{verbatim}
+
+	\begin{itemize}[leftmargin=*]
+		\item Calling \texttt{rnn(x, h0)} once (\emph{in one go}) is the same as looping over steps -- iterations happen internally.
+		\item Per step, tensors \textbf{lose the step axis}: \texttt{xt} is \texttt{(1,10)}, \texttt{ht} is \texttt{(1,20)} -- both 2D.
+	\end{itemize}
+
+	\textbf{As a module (RNN + Linear head):}
+
+\begin{verbatim}
+class RecurrentNet(torch.nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super().__init__()
+        self.rnn    = torch.nn.RNN(input_size, hidden_size, batch_first=True)
+        self.linear = torch.nn.Linear(hidden_size, output_size)
+    def forward(self, x):
+        _, h = self.rnn(x)
+        return self.linear(h[-1])    # last hidden state -> output
+\end{verbatim}
+
+	\begin{itemize}[leftmargin=*]
+		\item Two layers: \textbf{(Simple) RNN} $\to$ \textbf{Linear / Softmax} head.
+		\item \texttt{h[-1]} = last hidden state $\Rightarrow$ \textbf{many-to-one} (one prediction per sequence).
+		\item Can be packed into \texttt{torch.nn.Sequential} for convenience.
+	\end{itemize}
+
+	\begin{importantbox}
+		The \textbf{Linear head is always present} -- it projects the hidden state to the task's output size:
+		\[
+		\text{out} = W\, h_{[-1]} + b, \qquad W \in \mathbb{R}^{n_{out} \times n_h}
+		\]
+		\begin{itemize}[leftmargin=*]
+			\item \texttt{hidden\_size} ($n_h$) is an \textbf{architectural} choice; \texttt{output\_size} ($n_{out}$) is \textbf{fixed by the task} (\#classes, or 1 for regression). The Linear bridges the two.
+			\item \textbf{Softmax} is optional and goes \emph{after} Linear: it turns logits into probabilities without changing the dimension ($n_{out} \to n_{out}$).
+			\item It is \textbf{Linear always, Softmax sometimes} -- not either/or.
+		\end{itemize}
+	\end{importantbox}
+
+	\subsection{Implementation in Keras (\texttt{SimpleRNN})}
+
+\begin{verbatim}
+model = Sequential()
+model.add(SimpleRNN(units=n_hidden, input_shape=(maxlen, len_alphabet)))
+model.add(Dense(n_languages, activation='softmax'))
+model.compile(loss='categorical_crossentropy', optimizer='adam',
+              metrics=['accuracy'])
+model.summary()
+\end{verbatim}
+
+	\begin{itemize}[leftmargin=*]
+		\item \texttt{units}: dimension of the hidden state ($n_h$).
+		\item \texttt{input\_shape=(maxlen, len\_alphabet)}: sequence length $\times$ dimension of one element.
+		\item \texttt{Dense(..., activation='softmax')}: classification head (e.g.\ into languages).
+	\end{itemize}
+
+	\begin{formulabox}
+		\textbf{Parameter counts:}
+		\[
+		\text{SimpleRNN} = n_h\,(n_h + n_x + 1), \qquad
+		\text{Dense} = n_{out}\,(n_h + 1)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $n_h$: hidden units, \; $n_x$: input element dim, \; $n_{out}$: \#outputs; the $+1$ is the bias.
+	\end{itemize}
+
+	\textbf{Worked example} ($n_h=64$, $n_x=74$, $n_{out}=5$):
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Layer & Output shape & Params \\
+			\midrule
+			SimpleRNN(64) & (None, 64) & $64(64{+}74{+}1) = 8896$ \\
+			Dense(5, softmax) & (None, 5) & $5(64{+}1) = 325$ \\
+			\midrule
+			\textbf{Total} & & \textbf{9221} \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	Breakdown of the 8896: $W_{xh}\,(64{\times}74){=}4736$, $W_{hh}\,(64{\times}64){=}4096$, $b\,(64){=}64$.
+
+	\begin{importantbox}
+		\textbf{Significant parameter sharing}: the RNN reuses the \emph{same} weights at every time step, so the count is \textbf{independent of sequence length}. An equivalent MLP (with \texttt{maxlen=18}) would need $\approx 85{,}312$ params -- vs.\ $9221$ here.
+	\end{importantbox}
+
+	\subsection{Stacking RNNs (Deep RNNs)}
+
+	\begin{definitionbox}
+		\textbf{Stacked / deep RNN}: several RNN layers on top of each other. The sequence of hidden states from layer $l$ is the \textbf{input} to layer $l{+}1$ at every time step -- depth builds more abstract temporal features.
+	\end{definitionbox}
+
+	\begin{center}
+		\begin{tikzpicture}[
+			>={Stealth[round]},
+			cell/.style={draw, fill=green!20, minimum width=9mm, minimum height=7mm},
+			inp/.style={circle, draw, fill=blue!25, minimum size=6mm, inner sep=0pt}]
+			% layer 1
+			\node[cell] (a0) {$A$};
+			\node[cell, right=12mm of a0] (a1) {$A$};
+			\node[cell, right=12mm of a1] (a2) {$A$};
+			\node[cell, right=18mm of a2] (at) {$A$};
+			% layer 2 (above) + inputs
+			\foreach \i in {0,1,2,t} {
+				\node[cell, above=12mm of a\i] (b\i) {$A$};
+				\node[inp, below=7mm of a\i] (x\i) {$x_{\i}$};
+				\draw[->] (x\i) -- (a\i);
+				\draw[->] (a\i) -- (b\i);
+			}
+			% horizontal recurrence
+			\draw[->] (a0) -- (a1); \draw[->] (a1) -- (a2); \draw[->] (a2) -- (at);
+			\draw[->] (b0) -- (b1); \draw[->] (b1) -- (b2); \draw[->] (b2) -- (bt);
+			% head
+			\node[draw, fill=green!30, above=7mm of bt, align=center] (sm) {softmax\\/ linear};
+			\draw[->] (bt) -- (sm);
+			% ellipses
+			\node at ($(a2)!0.5!(at)$) {$\cdots$};
+			\node at ($(b2)!0.5!(bt)$) {$\cdots$};
+			\node at ($(x2)!0.5!(xt)$) {$\cdots$};
+			% layer labels
+			\node[left=3mm of a0] {\footnotesize Layer 1};
+			\node[left=3mm of b0] {\footnotesize Layer 2};
+		\end{tikzpicture}
+	\end{center}
+
+\begin{verbatim}
+model.add(SimpleRNN(n_hidden, input_shape=(maxlen, len_alphabet),
+                    return_sequences=True))    # layer 1
+model.add(SimpleRNN(n_hidden, return_sequences=True))    # layer 2
+model.add(SimpleRNN(n_hidden, return_sequences=False))   # last layer
+model.add(Dense(n_languages, activation='softmax'))
+\end{verbatim}
+
+	\begin{importantbox}
+		\begin{itemize}[leftmargin=*]
+			\item \texttt{return\_sequences=True} (lower layers): output the state at \textbf{every} time step, so the full sequence is passed to the next layer.
+			\item \texttt{return\_sequences=False} (last RNN layer): output \textbf{only the last} state $\Rightarrow$ feeds the \texttt{Dense}/softmax head (many-to-one).
+			\item \textbf{PyTorch}: use the \texttt{num\_layers} argument of \texttt{nn.RNN} to stack directly.
+		\end{itemize}
+	\end{importantbox}
+
 	\subsection{Training: BPTT}
 	\begin{itemize}[leftmargin=*]
 		\item \textbf{Backprop Through Time}: unroll the network and backprop over steps.
 		\item Suffers from vanishing/exploding gradients over long sequences.
 		\item \textbf{Gradient clipping} controls exploding gradients.
 	\end{itemize}
-	
-	\subsection{Gated Units}
-	
+
+	\subsection{Backprop with a Single-Layer RNN}
+
+	\begin{definitionbox}
+		BPTT = \textbf{unroll} the RNN, then apply the \textbf{chain rule} backward. The loss (cross-entropy on the softmax output) flows back through the output head, then \textbf{backward through time} via the hidden states.
+	\end{definitionbox}
+
+	\begin{center}
+		\includegraphics[width=\linewidth]{images_summary/bptt_single_layer_rnn.png}
+	\end{center}
+
+	\begin{formulabox}
+		\textbf{Recurrence Jacobian} (the key term), with $z_s = W_x x_s + W_h h_{s-1} + b_h$:
+		\[
+		\frac{\partial h_s}{\partial h_{s-1}} = W_h^\top \, g'(z_s)
+		\]
+		\textbf{Shared params} $\Rightarrow$ sum over all steps (full BPTT gradient):
+		\[
+		\frac{\partial L_{ce}}{\partial W_h}
+		= \frac{\partial L_{ce}}{\partial \hat y}\,\frac{\partial \hat y}{\partial h_t}
+		\sum_{s=1}^{t+1}\underbrace{\left(\prod_{\tau=s}^{t}\frac{\partial h_\tau}{\partial h_{\tau-1}}\right)}_{\text{chain back through time}}\frac{\partial h_{s-1}}{\partial W_h}
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $g = f$: the activation; $g'(z_s)$: its derivative (diagonal). \; $W_h^\top$: transposed recurrent weights.
+		\item All partials ($\partial h_t/\partial W_x,\,\partial h_t/\partial W_h,\,\partial h_t/\partial b_h$) are vectors/matrices -- straightforward per cell.
+		\item Output head: $\hat y = \mathrm{softmax}(W_s h_t + b_s)$; backprop starts at $\partial L_{ce}/\partial \hat y$.
+		\item Gradient from step $t$ back to step $k$ is a \textbf{product} of Jacobians $\prod_{s} W_h^\top g'(z_s)$.
+	\end{itemize}
+
 	\begin{importantbox}
-		\textbf{LSTM} adds a cell state $c_t$ with input, forget, and output gates -- lets information persist over long ranges. \textbf{GRU} is a lighter variant with update \& reset gates.
+		That long \textbf{product of $W_h^\top g'(z_s)$ terms} is exactly why gradients \textbf{vanish} (factors $<1$) or \textbf{explode} (factors $>1$) over long sequences -- motivating gradient clipping and gated units (LSTM/GRU).
 	\end{importantbox}
-	
+
+	\subsection{Gradient Clipping}
+
+	\begin{definitionbox}
+		For \textbf{exploding gradients}: \textbf{clip the gradient before the update step} so a single step cannot become huge.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{clipnorm}: clip the \emph{length (norm)} of the whole gradient vector.
+		\item \textbf{clipvalue}: clip the \emph{absolute value} of each component individually.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{Cliff intuition} (Goodfellow): composite multiplication of weights creates extremely steep regions (\emph{cliffs}). At a cliff the gradient becomes very large, so even a \emph{small} step jumps far off course. Clipping bounds the step and keeps training stable.
+	\end{importantbox}
+
+	\subsection{Long-Term Dependencies: Captured but Hard to Learn}
+
+	\begin{importantbox}
+		Simple RNNs are \textbf{Turing-complete} -- in principle they can approximate any algorithm and keep arbitrary (incl.\ long-term) memory. \textbf{In practice} they fail to \emph{learn} long-term dependencies due to \textbf{vanishing/exploding gradients}.
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Capacity vs.\ learnability}: the representational power exists; gradient-based training is what breaks down.
+		\item Problem identified by \textbf{Hochreiter \& Schmidhuber (1991)} and \textbf{Bengio, Simard \& Frasconi (1994)}.
+	\end{itemize}
+
+	\textbf{Attempts to solve it:}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{LSTM} cells (Hochreiter \& Schmidhuber, 1997).
+		\item \textbf{GRU} (Cho et al., 2014).
+		\item Suitable \textbf{weight initialisation}.
+	\end{itemize}
+
+	\subsection{Long-Term Memory and Gating (Intro to LSTM/GRU)}
+
+	\begin{definitionbox}
+		Two ideas fix the vanishing-gradient problem of vanilla RNNs:
+		\begin{itemize}[leftmargin=*]
+			\item \textbf{Long memory (pass-through)}: a direct path for the recurrent state (like a \textbf{ResNet residual connection}) so it is \emph{not} repeatedly squashed through a non-linearity.
+			\item \textbf{Gating}: update the state as a \textbf{weighted average} of its previous value and a candidate update; the weight (a ``forget gate'') depends on input and state $\Rightarrow$ \textbf{multiplicative} structure.
+		\end{itemize}
+	\end{definitionbox}
+
+	\begin{formulabox}
+		Simplest gating cell:
+		\[
+		z_t = \sigma(W_z x_t + U_z h_{t-1}),\qquad
+		\tilde h_t = f(W x_t + U h_{t-1})
+		\]
+		\[
+		h_t = z_t \odot h_{t-1} + (1-z_t)\odot \tilde h_t
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $z_t$: update/forget gate, $\sigma$ (sigmoid) $\Rightarrow z_t\in(0,1)$. \quad $\odot$: element-wise multiplication.
+		\item $\tilde h_t$: candidate state from a \textbf{simple cell} ($f=\tanh$ or relu). \quad $h_{t-1}$: previous state (pass-through).
+		\item $z_t\!\to\!1$: keep old state (remember); $z_t\!\to\!0$: overwrite with candidate (update). This is the core of \textbf{GRU}; LSTM splits it into separate input/forget/output gates with a cell state $c_t$.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		>={Stealth[round]},
+		box/.style={draw, rounded corners, fill=blue!12, minimum height=7mm, minimum width=16mm, align=center, font=\footnotesize},
+		dot/.style={circle, fill=black, inner sep=1.3pt},
+		every node/.style={font=\footnotesize},
+		]
+		% nodes
+		\node (in)   at (0,0)        {$h_{t-1}$};
+		\node[dot] (split) at (1,0)  {};
+		\node[box] (gate) at (5.3,0.4)  {weighted avg\\(gate)};
+		\node[dot] (join) at (6.6,0.4)  {};
+		\node (out)  at (8.6,0.4)    {$h_t$};
+		\node[box] (sig)  at (2.4,-0.4) {$\sigma$: compute\\weight};
+		\node[box] (cell) at (3.6,-1.6) {simple cell\\(relu, tanh)};
+		\node (x)    at (3.0,-3.0)   {$x_t$};
+		\node[dot] (xb) at (3.0,-2.5) {};
+		% pass-through (top) into gate
+		\draw[->, thick] (in) -- (split);
+		\draw[->, thick] (split) |- (gate.west);
+		% h_{t-1} into sub-cells
+		\draw[->] (split) |- (sig.west);
+		\draw[->] (split) |- (cell.west);
+		% x_t into sub-cells
+		\draw[->, red] (x) -- (xb);
+		\draw[->, red] (xb) -| (sig.south);
+		\draw[->, red] (xb) -| (cell.south);
+		% sub-cell outputs into gate
+		\draw[->] (sig.east)  -| node[pos=0.25,above]{$z_t$} ($(gate.south)+(-0.3,0)$);
+		\draw[->] (cell.east) -| node[pos=0.25,above]{$\tilde h_t$} ($(gate.south)+(0.3,0)$);
+		% gate -> out
+		\draw[->, thick] (gate.east) -- (join) -- (out.west);
+		% cell boundary
+		\begin{scope}[on background layer]
+		\node[draw=green!50!black, fill=green!8, rounded corners,
+		      fit={(sig) (cell) (gate) (split) (xb)}, inner sep=5pt] {};
+		\end{scope}
+	\end{tikzpicture}\\[2pt]
+	{\footnotesize Simplest form of a gating cell: \quad $h_t = z_t\odot h_{t-1} + (1-z_t)\odot \tilde h_t$ \;(element-wise).}
+	\end{center}
+
+	\subsection{Long Short-Term Memory (LSTM)}
+
+	\begin{definitionbox}
+		\textbf{LSTM} (Hochreiter \& Schmidhuber, \textbf{1997}): same cyclic RNN structure, but the cell carries \textbf{two} states -- it adds a \textbf{long-term memory} $c_t$ (cell state) alongside the hidden state $h_t$.
+	\end{definitionbox}
+
+	\begin{center}
+	\begin{tabular}{@{}lll@{}}
+		\toprule
+		\textbf{State} & \textbf{Role} & \textbf{Flows} \\
+		\midrule
+		$c_t$ & long-term memory (cell state) & $c_{t-1}\to c_t$ \\
+		$h_t$ & short-term / working memory + output & $h_{t-1}\to h_t$ \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		>={Stealth[round]},
+		every node/.style={font=\footnotesize},
+		]
+		\node[draw=green!50!black, fill=green!10, rounded corners, minimum width=28mm, minimum height=20mm] (cell) {LSTM};
+		% long-term memory line (top)
+		\node[left=10mm of cell.west, yshift=4mm]  (cin)  {$c_{t-1}$};
+		\node[right=10mm of cell.east, yshift=4mm] (cout) {$c_t$};
+		\node[right=1mm of cout] {long-term memory};
+		\draw[->] (cin) -- (cin-|cell.west);
+		\draw[->] (cell.east|-cout) -- (cout);
+		% short-term / working memory line (bottom)
+		\node[left=10mm of cell.west, yshift=-4mm]  (hin)  {$h_{t-1}$};
+		\node[right=10mm of cell.east, yshift=-4mm] (hout) {$h_t$};
+		\node[right=1mm of hout] {short-term / working memory};
+		\draw[->] (hin) -- (hin-|cell.west);
+		\draw[->] (cell.east|-hout) -- (hout);
+		% input
+		\node[below=8mm of cell.south, fill=blue!20, circle, inner sep=1.5pt] (x) {$x_t$};
+		\draw[->] (x) -- (cell.south);
+		% output h_t (top)
+		\node[above=8mm of cell.north, fill=violet!25, circle, inner sep=1.5pt] (hy) {$h_t$};
+		\draw[->] (cell.north) -- (hy);
+	\end{tikzpicture}\\[2pt]
+	{\footnotesize LSTM unit: two memory channels in/out, plus input $x_t$; $h_t$ is also the output.}
+	\end{center}
+
+	\subsection{Internals of an LSTM Cell}
+
+	\begin{definitionbox}
+		The long-term memory $c_t$ is updated through \textbf{gates} (the $\times$ nodes). A gate controls how information flows between the short-term state $h_{t-1}$, the input $x_t$, and the long-term state $c_t$. Three gates:
+		\begin{enumerate}[leftmargin=*, nosep]
+			\item \textbf{Forget gate} $f_t$ -- how much of $c_{t-1}$ to keep.
+			\item \textbf{Input gate} $i_t$ -- how much of the candidate $\tilde c_t$ to write.
+			\item \textbf{Output gate} $o_t$ -- how much of $\tanh(c_t)$ to expose as $h_t$.
+		\end{enumerate}
+	\end{definitionbox}
+
+	\begin{formulabox}
+		Each gate = \textbf{affine transform} of $[x_t, h_{t-1}]$ + \textbf{activation}:
+		\[
+		f_t = \sigma(W_f x_t + U_f h_{t-1} + b_f),\quad
+		i_t = \sigma(W_i x_t + U_i h_{t-1} + b_i),\quad
+		o_t = \sigma(W_o x_t + U_o h_{t-1} + b_o)
+		\]
+		\[
+		\tilde c_t = \tanh(W_c x_t + U_c h_{t-1} + b_c)
+		\]
+		\textit{Equivalent split-subscript notation} ($W_{\bullet,x}\equiv W_\bullet,\; W_{\bullet,h}\equiv U_\bullet$), e.g.:
+		\[
+		f_t = \sigma\!\left(W_{f,x}\cdot x_t + W_{f,h}\cdot h_{t-1} + b_f\right),\qquad
+		o_t = \sigma\!\left(W_{o,x}\cdot x_t + W_{o,h}\cdot h_{t-1} + b_o\right)
+		\]
+		\textbf{State updates} (element-wise $\odot$):
+		\[
+		c_t = f_t \odot c_{t-1} + i_t \odot \tilde c_t,
+		\qquad
+		h_t = o_t \odot \tanh(c_t)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $f_t, i_t, o_t \in (0,1)^d$: gate vectors ($\sigma$). \quad $\tilde c_t$: candidate cell content ($\tanh$).
+		\item $W_\bullet, U_\bullet, b_\bullet$: per-gate weights/bias (4 sets, all learned). \quad $\odot$: element-wise product.
+		\item Gates implemented by: \textbf{affine transform} $\to$ \textbf{activation} $\to$ \textbf{element-wise multiplication}.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		>={Stealth[round]}, font=\footnotesize,
+		op/.style={circle, draw, fill=red!18, inner sep=0pt, minimum size=5mm},
+		gate/.style={draw, fill=yellow!45, minimum width=7mm, minimum height=5mm, font=\scriptsize},
+		ell/.style={draw, ellipse, fill=red!12, inner sep=1pt, minimum width=9mm, font=\scriptsize},
+		]
+		% cell-state (top) line
+		\node (cin)  at (-0.6,1.2) {$c_{t-1}$};
+		\node (cout) at ( 7.4,1.2) {$c_t$};
+		\node[op] (m1)   at (1.5,1.2) {$\times$};
+		\node[op] (plus) at (3.5,1.2) {$+$};
+		% intermediate ops
+		\node[op]  (m2) at (3.5,0.3) {$\times$};
+		\node[ell] (to) at (5.6,0.6) {tanh};
+		\node[op]  (m3) at (5.6,-0.1){$\times$};
+		% gates
+		\node[gate] (gf) at (1.5,-0.7) {$\sigma$};
+		\node[gate] (gi) at (3.0,-0.7) {$\sigma$};
+		\node[gate] (gc) at (4.0,-0.7) {tanh};
+		\node[gate] (go) at (5.2,-0.7) {$\sigma$};
+		% gate index tags
+		\node[red,font=\scriptsize] at ($(m1)+(0.45,0.32)$) {1};
+		\node[red,font=\scriptsize] at ($(m2)+(0.5,0.3)$) {2};
+		\node[red,font=\scriptsize] at ($(m3)+(0.55,0.18)$) {3};
+		% hidden-state (bottom) input line + output
+		\node (hin)  at (-0.6,-1.5) {$h_{t-1}$};
+		\node (hout) at ( 7.4,-1.5) {$h_t$};
+		\node[circle, fill=blue!25, inner sep=1.5pt] (x)  at (1.0,-2.6) {$x_t$};
+		\node[circle, fill=violet!30, inner sep=1.5pt] (hy) at (6.4,2.2) {$h_t$};
+		% --- top line ---
+		\draw[->,thick] (cin) -- (m1);
+		\draw[->,thick] (m1) -- (plus);
+		\draw[->,thick] (plus) -- (cout);
+		% forget gate
+		\draw[->] (gf) -- (m1) node[pos=0.45, right=1pt]{$f_t$};
+		% input path
+		\draw[->] (gi) |- node[pos=0.2, left=1pt]{$i_t$} (m2.west);
+		\draw[->] (gc) |- node[pos=0.2, right=1pt]{$\tilde c_t$} (m2.east);
+		\draw[->] (m2) -- (plus);
+		% output path
+		\draw[->] (5.6,1.2) -- (to);
+		\draw[->] (to) -- (m3);
+		\draw[->] (go) |- node[pos=0.2, left=1pt]{$o_t$} (m3.west);
+		\draw[->,thick] (m3) -| (hy);
+		\draw[->,thick] (m3) |- (hout);
+		% input bus (h_{t-1} + x_t feed all gates)
+		\draw[thick] (hin) -- (5.2,-1.5);
+		\draw[thick] (x) -- (1.0,-1.5);
+		\draw[->] (1.5,-1.5) -- (gf.south);
+		\draw[->] (3.0,-1.5) -- (gi.south);
+		\draw[->] (4.0,-1.5) -- (gc.south);
+		\draw[->] (5.2,-1.5) -- (go.south);
+		% boundary
+		\begin{scope}[on background layer]
+		\node[draw=green!50!black, fill=green!8, rounded corners,
+		      fit={(m1) (plus) (gf) (go) (to) (m3) (hin)}, inner sep=6pt] {};
+		\end{scope}
+	\end{tikzpicture}\\[2pt]
+	{\footnotesize Internals of an LSTM cell: gates 1 = forget, 2 = input, 3 = output.}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Multiplicative gating} ($i_t\odot\tilde c_t$, etc.) multiplies two factors that both depend on the input -- an interaction \textbf{not} present in MLPs, CNNs, or simple RNNs. This is what lets the cell selectively keep/erase memory.
+	\end{importantbox}
+
+	\subsection{Backprop with LSTMs: the Gradient Super-Highway}
+
+	\begin{definitionbox}
+		The cell-state line $c$ is a \textbf{``super-highway for backprop''}: the gradient flows backward along $c$ across many steps almost unobstructed -- at each step it is only \textbf{multiplied by the forget gate} $f_t$, with \emph{no} weight-matrix product and \emph{no} saturating non-linearity on this path.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		From the additive cell update:
+		\[
+		c_t = f_t \odot c_{t-1} + i_t \odot \tilde c_t
+		\quad\Longrightarrow\quad
+		\frac{\partial c_t}{\partial c_{t-1}} = f_t
+		\]
+		Gradient from step $t$ back to step $s$:
+		\[
+		\frac{\partial c_t}{\partial c_s}
+		= \prod_{\tau=s+1}^{t} \frac{\partial c_\tau}{\partial c_{\tau-1}}
+		= \prod_{\tau=s+1}^{t} f_\tau
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $f_\tau \in (0,1)$: forget gate, \textbf{time-dependent} and \textbf{learned} per step.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		>={Stealth[round]}, font=\footnotesize,
+		cell/.style={draw=green!55!black, fill=green!12, rounded corners,
+		             minimum width=2cm, minimum height=1.3cm},
+		]
+		\node[cell] (A) at (0,0)   {};
+		\node[cell] (B) at (3.4,0) {};
+		\node[cell] (C) at (6.8,0) {};
+		\foreach \n in {A,B,C}{ \node at (\n.center) {\scriptsize LSTM}; }
+		% cell-state highway (top) + forget multiply markers
+		\draw[very thick] (-1.7,0.5) -- (8.5,0.5);
+		\foreach \x in {0,3.4,6.8}{ \node[font=\tiny] at (\x-0.45,0.72) {$\times f$}; }
+		\node[left]  at (-1.7,0.5) {$c_{t-2}$};
+		\node[font=\footnotesize] at (1.7,0.72)  {$c_{t-1}$};
+		\node[font=\footnotesize] at (5.1,0.72)  {$c_t$};
+		\node[right] at (8.5,0.5)  {$c_{t+1}$};
+		% backward gradient arrows (the "highway")
+		\foreach \a/\b in {1.1/-1.7, 4.5/2.3, 7.9/5.7}{
+			\draw[->, red, very thick] (\a,0.95) -- (\b,0.95); }
+		% hidden-state line (bottom) + outputs up
+		\draw[thick] (-1.7,-0.5) -- (8.5,-0.5);
+		\node[left]  at (-1.7,-0.5) {$h_{t-2}$};
+		\node[right] at (8.5,-0.5) {$h_{t+1}$};
+		\foreach \x/\lab in {0/{h_{t-1}}, 3.4/{h_t}, 6.8/{h_{t+1}}}{
+			\draw[->] (\x,0.65) -- (\x,1.4); \node[above] at (\x,1.4) {$\lab$}; }
+		\node[red, font=\bfseries] at (3.4,2.15) {``Super-Highway for Backprop''};
+	\end{tikzpicture}\\[2pt]
+	{\footnotesize Unrolled LSTMs: the cell state $c$ is a near-uninterrupted path for the backward gradient.}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Why this fixes vanishing/exploding gradients:}
+		\begin{itemize}[leftmargin=*]
+			\item \textbf{Vanilla RNN}: gradient $=\prod_\tau W_h^\top g'(z_\tau)$ -- the \emph{same} weight matrix repeated $\Rightarrow$ eigenvalues to the power of the sequence length $\Rightarrow$ exponential \textbf{vanish} ($<1$) or \textbf{explode} ($>1$), and the user cannot control it.
+			\item \textbf{LSTM cell path}: gradient $=\prod_\tau f_\tau$ -- a product of \textbf{forget gates the network learns}. Set $f_\tau\!\approx\!1$ and $\partial c_t/\partial c_s\!\approx\!1$: the gradient passes back \textbf{unchanged} over long ranges (a \emph{constant error carousel}, like a ResNet skip connection).
+			\item No weight-matrix multiply and no saturating non-linearity on this path $\Rightarrow$ vanishing is largely avoided; $f_\tau\in(0,1)$ keeps the product $\le 1$ $\Rightarrow$ no explosion either.
+			\item \textbf{Gotcha}: $f_\tau\!\to\!0$ \emph{does} still vanish -- but only where the model \textbf{chose to forget} (no dependency to carry there), \textbf{not} forced everywhere as in a vanilla RNN. Initialising the forget-gate bias $b_f$ large positive makes $f_\tau\!\approx\!1$ \textbf{by default}, so gradients flow unless the cell learns to close the gate.
+		\end{itemize}
+	\end{importantbox}
+
+	\subsection{Gated Recurrent Unit (GRU)}
+
+	\begin{definitionbox}
+		\textbf{GRU} (Cho et al., 2014): the most popular LSTM variant. Differences from LSTM:
+		\begin{itemize}[leftmargin=*, nosep]
+			\item \textbf{No separate long-term memory} $c_t$ -- everything lives in $h_t$.
+			\item \textbf{Forget + input gates merged} into one \textbf{update gate} $u_t$.
+			\item \textbf{Reset (relevance) gate} $r_t$ -- how much past state enters the candidate.
+		\end{itemize}
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\[
+		r_t = \sigma(W_{rh}\,h_{t-1} + W_{rx}\,x_t + b_r),\qquad
+		u_t = \sigma(W_{uh}\,h_{t-1} + W_{ux}\,x_t + b_u)
+		\]
+		\[
+		\tilde h_t = \tanh\!\big(W_{ch}\,(r_t \odot h_{t-1}) + W_{cx}\,x_t + b_c\big)
+		\]
+		\[
+		h_t = (1-u_t)\odot h_{t-1} + u_t \odot \tilde h_t
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $r_t$: reset/relevance gate -- gates $h_{t-1}$ \emph{inside} the candidate. \quad $u_t$: update gate -- interpolates old state vs.\ candidate.
+		\item $\tilde h_t$: candidate state. \quad $u_t\!\to\!0$: keep $h_{t-1}$; $u_t\!\to\!1$: take candidate.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		>={Stealth[round]}, font=\footnotesize,
+		op/.style={circle, draw, fill=red!18, inner sep=0pt, minimum size=5mm},
+		gate/.style={draw, fill=yellow!45, minimum width=7mm, minimum height=5mm, font=\scriptsize},
+		]
+		% hidden-state (top) line
+		\node (hin)  at (-0.9,1.3) {$h_{t-1}$};
+		\node (hout) at ( 6.0,1.3) {$h_t$};
+		\node[op] (mtop) at (3.0,1.3) {$\times$};
+		\node[op] (plus) at (4.4,1.3) {$+$};
+		% intermediate ops
+		\node[op] (om) at (3.0,0.5) {\scriptsize $1{-}$};
+		\node[op] (mu) at (4.4,0.4) {$\times$};
+		\node[op] (mr) at (0.6,-0.35) {$\times$};
+		% gates
+		\node[gate] (gr) at (0.6,-0.9) {$\sigma$};
+		\node[gate] (gu) at (2.4,-0.9) {$\sigma$};
+		\node[gate] (gc) at (3.6,-0.9) {tanh};
+		% input
+		\node[circle, fill=blue!25, inner sep=1.5pt] (x)  at (1.5,-2.7) {$x_t$};
+		\node[circle, fill=violet!30, inner sep=1.5pt] (hy) at (4.4,2.3) {$h_t$};
+		% top line
+		\draw[->,thick] (hin) -- (mtop);
+		\draw[->,thick] (mtop) -- (plus);
+		\draw[->,thick] (plus) -- (hout);
+		\draw[->,thick] (plus) -- (hy);
+		% h_{t-1} branch down to reset mult
+		\node[circle,fill=black,inner sep=1pt] (sp) at (-0.3,1.3) {};
+		\draw[thick] (sp) -- (-0.3,-1.7);
+		\draw[->] (-0.3,-0.35) -- (mr.west);
+		% reset path: r_t * h_{t-1} -> candidate
+		\draw[->] (gr) -- (mr) node[pos=0.78, right=2pt]{$r_t$};
+		\draw[->] (mr) -| (gc.north);
+		% candidate -> mu
+		\draw[->] (gc.east) -| node[pos=0.25, above]{$\tilde h_t$} (mu.south);
+		% update gate -> (1-) and mu
+		\node[circle,fill=black,inner sep=1pt] (du) at (2.4,0.1) {};
+		\draw[->] (gu) -- (du) node[pos=0.55, left=2pt]{\textcolor{red}{$u_t$}};
+		\draw[->] (du) |- (om.west);
+		\draw[->] (du) -| (mu.west);
+		% (1-) -> mtop ; mu -> plus
+		\draw[->] (om) -- (mtop);
+		\draw[->] (mu) -- (plus);
+		% input bus (h_{t-1}+x_t feed gates)
+		\draw[thick] (x) -- (1.5,-1.7);
+		\draw[thick] (-0.3,-1.7) -- (3.6,-1.7);
+		\draw[->] (0.6,-1.7) -- (gr.south);
+		\draw[->] (2.4,-1.7) -- (gu.south);
+		\draw[->] (3.6,-1.7) -- (gc.south);
+		% boundary
+		\begin{scope}[on background layer]
+		\node[draw=green!50!black, fill=green!8, rounded corners,
+		      fit={(mtop) (plus) (gr) (gc) (mr) (mu) (om)}, inner sep=6pt] {};
+		\end{scope}
+	\end{tikzpicture}\\[2pt]
+	{\footnotesize GRU cell: reset gate $r_t$ inside the candidate; update gate $u_t$ blends $h_{t-1}$ and $\tilde h_t$.}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Fewer parameters than LSTM}: only \textbf{3} weight matrices of size $n_h\times(n_h+n_x)$ ($W_r, W_c, W_u$) vs.\ LSTM's 4:
+		\[
+		\text{GRU} = 3\,n_h\,(n_h + n_x + 1)
+		\]
+		Often comparable accuracy to LSTM at lower cost.
+	\end{importantbox}
+
+	\subsection{Implementation in Keras (\texttt{LSTM})}
+
+	\textbf{Human Activity Recognition} example: single LSTM layer, classify on the \textbf{last} cell's output ($\Rightarrow$ \texttt{return\_sequences=False}).
+
+\begin{verbatim}
+n_steps  = len(X_train[0])      # 128 timesteps per series
+n_input  = len(X_train[0][0])   # 9 input features per timestep
+n_hidden = 32                   # hidden state dimension
+n_classes = 6
+
+model = Sequential()
+model.add(LSTM(units=n_hidden, return_sequences=False,
+               input_shape=(n_steps, n_input)))
+model.add(Dense(n_classes, activation='softmax'))
+model.compile(loss='categorical_crossentropy', optimizer='adam',
+              metrics=['accuracy'])
+\end{verbatim}
+
+	\begin{itemize}[leftmargin=*]
+		\item Defaults: \texttt{activation=tanh} (candidate), \texttt{recurrent\_activation=sigmoid} (gates).
+		\item \texttt{return\_sequences}: \texttt{False} $\to$ last output only (many-to-one); \texttt{True} $\to$ output at every step (many-to-many / stacking).
+	\end{itemize}
+
+	\begin{formulabox}
+		\textbf{LSTM parameter count} -- \textbf{4 gates} ($k=f,i,c,o$), each a $W_k$ and bias $b_k$:
+		\[
+		\text{LSTM} = 4\,\big[\,n_h(n_h + n_x) + n_h\,\big] = 4\,n_h\,(n_h + n_x + 1)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $n_h$: hidden units, \; $n_x$: input feature dim; the $+1$ is the per-gate bias.
+		\item Each gate stacks $W_{k}=[n_h\times(n_h+n_x)]$ (acts on $[h_{t-1},x_t]$) and $b_k=[n_h\times1]$.
+	\end{itemize}
+
+	\textbf{Worked example} ($n_h=32$, $n_x=9$, $n_{out}=6$):
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Layer & Output shape & Params \\
+			\midrule
+			LSTM(32) & (None, 32) & $4\cdot 32(32{+}9{+}1) = 5376$ \\
+			Dense(6, softmax) & (None, 6) & $6(32{+}1) = 198$ \\
+			\midrule
+			\textbf{Total} & & \textbf{5574} \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	Per gate: $W_k\,[32{\times}(32{+}9)]{=}1312$, $b_k\,[32]{=}32 \Rightarrow 1344$; $\times 4 = 5376$.
+
+	\begin{importantbox}
+		An LSTM has \textbf{4$\times$} the parameters of a vanilla RNN of the same size (4 gates vs.\ 1). Count is still \textbf{independent of sequence length} (weight sharing across time).
+	\end{importantbox}
+
+	\subsection{Regularisation in RNNs}
+
+	\begin{importantbox}
+		\textbf{Batch-norm \emph{across time} is not reasonable}:
+		\begin{itemize}[leftmargin=*, nosep]
+			\item The activation distribution \textbf{should} be allowed to change over time steps.
+			\item The \textbf{same} scale parameter reused at every step can cause \textbf{exploding gradients}.
+		\end{itemize}
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Batch-norm in the vertical direction is fine}: apply it \textbf{between stacked RNN layers} (depth), not along the time axis.
+	\end{itemize}
+
+	\begin{definitionbox}
+		\textbf{Dropout in RNNs} -- two variants, both using the \textbf{same mask at every time step}:
+	\end{definitionbox}
+	\begin{center}
+		\begin{tabular}{@{}lll@{}}
+			\toprule
+			\textbf{Keras keyword} & \textbf{Mask applied to} & \textbf{Note} \\
+			\midrule
+			\texttt{dropout} (or \texttt{Dropout} layer) & input / output units & feed-forward connections \\
+			\texttt{recurrent\_dropout} & hidden-state units & recurrent connections \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Same mask across all time steps} (variational dropout) -- a fresh per-step mask would wipe out the memory signal.
+	\end{itemize}
+
+	\subsection{Handling Class Imbalance}
+
+	\begin{definitionbox}
+		\textbf{Class imbalance}: some classes have far more samples than others. The model can score high \textbf{accuracy} by predicting the majority and ignoring rare classes -- so accuracy is misleading; minority \textbf{recall} suffers.
+	\end{definitionbox}
+
+	\begin{center}
+		\begin{tabular}{@{}p{3.0cm}p{4.3cm}p{4.6cm}@{}}
+			\toprule
+			\textbf{Treatment} & \textbf{Mechanism} & \textbf{Trade-off} \\
+			\midrule
+			Minority \textbf{over-sampling} & Duplicate minority rows up to the majority count (sample \emph{with replacement}) & Balances data, model-agnostic; bigger set, \textbf{duplicates risk overfitting} \\
+			\textbf{Class weights} in loss & Weight per-class loss $\propto 1/\text{freq}$ (Keras \texttt{class\_weight}) & No extra data, fast; adds no new info, noisier gradients \\
+			(Under-sampling) & Drop majority rows & Smaller/faster; \textbf{throws away data} \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\textbf{Over-sampling, in code} (resample each minority class to \texttt{group\_size} $=$ majority count):
+\begin{verbatim}
+group_size = names['lang'].value_counts().max()   # size of majority class
+lang_upsampled = resample(lang_names, replace=True,    # WITH replacement
+                          n_samples=group_size,        # match majority
+                          random_state=123)            # reproducible
+\end{verbatim}
+
+	\begin{importantbox}
+		\textbf{Pitfall -- data leakage}: over-sample \textbf{only the training set, after} the train/test split. Otherwise duplicated rows appear in both train \emph{and} test, inflating the metrics. (\texttt{class\_weight} avoids this -- the data is untouched.)
+	\end{importantbox}
+	\begin{itemize}[leftmargin=*]
+		\item \texttt{replace=True} is required: a minority class has fewer unique rows than \texttt{group\_size}.
+		\item Report \textbf{per-class recall / macro-F1} (or a confusion matrix), not raw accuracy -- that is where the improvement shows.
+	\end{itemize}
+
 	\subsection{Exam Tips}
-	
+
 	\begin{examtipbox}
-		The forget gate is the key to LSTM's long-memory ability. RNNs are sequential -> hard to parallelize over time (a motivation for Transformers). Know the difference: many-to-one (classification), many-to-many (tagging/translation).
+		\textbf{Likely to derive:}
+		\begin{itemize}[leftmargin=*, nosep]
+			\item \textbf{BPTT}: unroll, chain rule back through time. Recurrence Jacobian $\partial h_s/\partial h_{s-1}=W_h^\top g'(z_s)$; full gradient \emph{sums over steps}. The \textbf{product} $\prod W_h^\top g'(z_\tau)$ $\Rightarrow$ vanishing ($<1$) / exploding ($>1$).
+			\item \textbf{LSTM super-highway}: from $c_t=f_t\odot c_{t-1}+i_t\odot\tilde c_t$ get $\partial c_t/\partial c_{t-1}=f_t$ and $\partial c_t/\partial c_s=\prod_\tau f_\tau$ $\Rightarrow$ explain why it fixes vanishing/exploding (learned gates, $f\!\approx\!1$ = identity path).
+		\end{itemize}
+		\textbf{Likely to compute:}
+		\begin{itemize}[leftmargin=*, nosep]
+			\item \textbf{Param counts} (independent of sequence length -- weight sharing!): SimpleRNN $n_h(n_h{+}n_x{+}1)$, \textbf{LSTM} $4\,n_h(n_h{+}n_x{+}1)$, \textbf{GRU} $3\,n_h(n_h{+}n_x{+}1)$, Dense head $n_{out}(n_h{+}1)$.
+			\item \textbf{Tensor shapes} (\texttt{torch.nn.RNN}): \texttt{output} = all steps $(b,T,n_h)$; \texttt{hn} = last step only $(b,1,n_h)$.
+		\end{itemize}
+		\textbf{Likely to explain / compare:}
+		\begin{itemize}[leftmargin=*, nosep]
+			\item \textbf{Why RNN for sequences}: order matters, parameter sharing, arbitrary length. Sequential $\Rightarrow$ hard to parallelise over time (motivation for Transformers).
+			\item \textbf{Sequence categories}: one-to-many, many-to-one (classification), many-to-many \emph{aligned} (NER, $n{:}n$) vs \emph{unaligned} (translation, needs seq2seq).
+			\item \textbf{3 gates}: forget/input/output; $c_t$ = long-term, $h_t$ = short-term memory. \textbf{Forget gate} = key to long memory. \textbf{Multiplicative} gating is absent in MLP/CNN/vanilla RNN.
+			\item \textbf{GRU vs LSTM}: GRU has no $c_t$, merges forget+input into the update gate $u_t$, adds reset gate $r_t$; 3 weight matrices vs 4 $\Rightarrow$ fewer params, similar accuracy.
+			\item \textbf{Remedies for vanishing/exploding}: gradient clipping (exploding only), LSTM/GRU gating, good weight init.
+			\item \texttt{return\_sequences}: \texttt{False} = last output (many-to-one); \texttt{True} = every step (many-to-many / stacking). Defaults: \texttt{activation=tanh}, \texttt{recurrent\_activation=sigmoid}.
+		\end{itemize}
+		\textbf{Common mistakes:}
+		\begin{itemize}[leftmargin=*, nosep]
+			\item Thinking gradient \textbf{clipping fixes vanishing} -- it only bounds \textbf{exploding}.
+			\item Forgetting LSTM has \textbf{4$\times$} a vanilla RNN's parameters (and GRU 3$\times$).
+			\item Confusing \texttt{output} vs \texttt{hn} shapes; confusing \emph{aligned} vs \emph{unaligned} many-to-many.
+			\item Applying \textbf{batch-norm across time} (wrong -- distribution should change; risks exploding gradients); it belongs \emph{vertically} between stacked layers. Dropout must use the \textbf{same mask at every step}.
+		\end{itemize}
 	\end{examtipbox}
 	
 	% ==================================================
