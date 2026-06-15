@@ -1834,36 +1834,462 @@ print(generated_text)
 		Know the split: \textbf{train time} $\rightarrow$ accuracy/perplexity; \textbf{test time} $\rightarrow$ BLEU/ROUGE/benchmarks. Be ready to say \textbf{BLEU = precision-oriented} (translation), \textbf{ROUGE = recall-oriented} (summarization), and that no metric fully captures ``meaning''.
 	\end{examtipbox}
 
+	\subsection{Why Word Embeddings?}
+
+	\begin{itemize}[leftmargin=*]
+		\item Network inputs must be \textbf{numerical, continuous} values $\Rightarrow$ words need a numeric encoding.
+		\item Naïve choice: \textbf{1-hot (``atomic'') encoding} -- one dimension per vocabulary word, a single $1$ at the word's index, $0$ elsewhere.
+		\item For a 50\,000-word vocabulary each word is a 50\,000-dim vector with a single $1$. \textbf{Generally does not work} as a classifier input.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{1-hot encoding is ``too sparse'':}
+		\begin{itemize}[leftmargin=1.2em]
+			\item Carries \emph{no information} beyond presence/absence of a word.
+			\item No \emph{distribution} of relevant information across inputs (each dim = one word).
+			\item No \emph{continuity}: all words are equidistant -- \texttt{apple} is as ``far'' from \texttt{orange} as from \texttt{car} (orthogonal, similarity $=0$).
+		\end{itemize}
+	\end{importantbox}
+
+	\begin{definitionbox}
+		\textbf{Goal of embeddings:} replace the long sparse 1-hot vector with a short \textbf{dense} vector whose geometry encodes meaning, so similar words end up close together.
+	\end{definitionbox}
+
 	\subsection{Word Embeddings}
 
 	\begin{definitionbox}
-		A \textbf{word embedding} maps each word to a dense low-dimensional vector so that semantically similar words are close. Learned from co-occurrence in large corpora.
+		A \textbf{word embedding} is a projection of a word into a vector of real numbers -- a mapping where each word becomes a \textbf{coordinate} in the embedding space. Two families:
+		\begin{itemize}[leftmargin=1.2em]
+			\item \textbf{Sparse} embedding -- e.g.\ 1-hot encoding.
+			\item \textbf{Dense} embedding -- e.g.\ word2vec, GloVe.
+		\end{itemize}
 	\end{definitionbox}
-	
-	\subsection{Word2Vec}
+
+	\textbf{Example -- dense embedding into a 3-D space} (each row = one word's vector):
+	\begin{center}
+	\begin{tabular}{l ccc}
+		\toprule
+		word & \multicolumn{3}{c}{embedding (dim 1--3)} \\
+		\midrule
+		\textit{anarchism}  & $0.5$  & $0.1$  & $-0.1$ \\
+		\textit{originated} & $-0.5$ & $0.3$  & $0.9$  \\
+		\textit{as}         & $0.3$  & $-0.5$ & $-0.3$ \\
+		\textit{a}          & $0.7$  & $0.2$  & $-0.3$ \\
+		\textit{term}       & $0.8$  & $0.1$  & $-0.1$ \\
+		\textit{of}         & $0.4$  & $-0.6$ & $-0.1$ \\
+		\textit{abuse}      & $0.7$  & $0.1$  & $-0.4$ \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\textbf{Example -- dense embedding into a 2-D space:} semantically related words cluster together.
+	\begin{center}
+	\begin{tikzpicture}[scale=1.0, font=\footnotesize]
+		\draw[->,gray] (-3.2,0) -- (3.2,0);
+		\draw[->,gray] (0,-2.2) -- (0,2.2);
+		% fruit cluster (upper left)
+		\node at (-2.4,1.4) {apple};
+		\node at (-2.0,1.0) {orange};
+		\node at (-2.4,0.7) {banana};
+		% food/drink cluster (upper right)
+		\node at (1.6,1.6) {juice};
+		\node at (0.6,1.0) {rice};
+		\node at (2.4,0.8) {milk};
+		% vehicle cluster (lower)
+		\node at (-0.6,-1.2) {bus};
+		\node at (-1.0,-1.6) {train};
+		\node at (0.4,-1.5) {car};
+	\end{tikzpicture}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Wanted property of the projection:} expose ``good'' features that make the task easier:
+		\begin{itemize}[leftmargin=1.2em]
+			\item \textbf{Distributed representation} of concepts -- meaning is spread across many dimensions (not one dim = one word).
+			\item \textbf{Continuity} -- words sharing similar concepts sit close together in the space.
+		\end{itemize}
+	\end{importantbox}
+
+	\subsection{Embedding Layer}
+
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{CBOW}: predict the center word from its context.
-		\item \textbf{Skip-gram}: predict context words from the center word.
-		\item \textbf{Negative sampling} makes training tractable.
+		\item \textbf{Input}: 1-hot encoding of the word in a vocabulary of size $V$ -- or just the \emph{index} of the ``hot'' entry.
+		\item \textbf{Weight matrix} $\mathbf{W}$ of shape $V \times N$ (one row per word).
+		\item \textbf{Output}: a single $N$-dim vector $\mathbf{h}$ = the embedding.
 	\end{itemize}
-	
-	\subsection{GloVe}
-	\begin{itemize}[leftmargin=*]
-		\item Factorizes the global word co-occurrence matrix.
-		\item Combines count-based and prediction-based ideas.
-	\end{itemize}
-	
+
 	\begin{formulabox}
-		Famous analogy property:
 		\[
-		\mathrm{vec}(\text{king}) - \mathrm{vec}(\text{man}) + \mathrm{vec}(\text{woman}) \approx \mathrm{vec}(\text{queen})
+		\mathbf{h} = \mathbf{x}^{\top}\mathbf{W} \;:=\; \mathbf{v}_{w_I}
 		\]
+		\begin{itemize}[leftmargin=1.2em]
+			\item $\mathbf{x}$: 1-hot input vector ($V$-dim), $1$ at index $I$.
+			\item $\mathbf{W}$: $V\times N$ embedding matrix.
+			\item $\mathbf{v}_{w_I}$: row $I$ of $\mathbf{W}$ = embedding of word $w_I$.
+		\end{itemize}
 	\end{formulabox}
-	
-	\subsection{Exam Tips}
-	
+
+	\begin{importantbox}
+		Because $\mathbf{x}$ is 1-hot, the matrix product $\mathbf{x}^{\top}\mathbf{W}$ is just a \textbf{row lookup}: it selects the row of $\mathbf{W}$ at the hot index -- no real multiplication needed. \\
+		\emph{Example:} if \texttt{orange} is the 2nd word ($I=2$), then $\mathbf{h}$ = row 2 of $\mathbf{W}$, e.g.\ $[0.3,\,0.1,\,-0.2,\dots]$.
+	\end{importantbox}
+
+	\begin{center}
+	\begin{tikzpicture}[font=\footnotesize,
+		innode/.style={circle,draw,fill=yellow!25,minimum size=16pt,inner sep=0},
+		outnode/.style={circle,draw,fill=green!25,minimum size=20pt,inner sep=0}]
+		% input nodes
+		\node[innode] (x1) at (0,3)    {$x_1$}; \node[left=3pt of x1] {$0$};
+		\node[innode] (x2) at (0,1.8)  {$x_2$}; \node[left=3pt of x2] {$1$};
+		\node         (xd) at (0,0.9)  {$\vdots$};
+		\node[innode] (xv) at (0,0)    {$x_V$}; \node[left=3pt of xv] {$0$};
+		% output nodes
+		\node[outnode] (h1) at (4,2.7) {$+$}; \node[right=3pt of h1] {$h_1$};
+		\node[outnode] (h2) at (4,1.5) {$+$}; \node[right=3pt of h2] {$h_2$};
+		\node          (hd) at (4,0.8) {$\vdots$};
+		\node[outnode] (hn) at (4,0.1) {$+$}; \node[right=3pt of hn] {$h_N$};
+		% edges
+		\foreach \i in {x1,x2,xv}{\foreach \j in {h1,h2,hn}{\draw[gray] (\i)--(\j);}}
+		% labels
+		\node[align=center] at (0,3.9) {\textbf{Input}\\$V$ dims};
+		\node[align=center] at (2,3.9) {\textbf{Weights}\\$V\times N$};
+		\node[align=center] at (4,3.9) {\textbf{Output}\\$N$ units};
+	\end{tikzpicture}
+	\end{center}
+
+	\subsection{Use of Embedding Layers}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Analogy with CNNs for image recognition:} the embedding layer is the \emph{first} layer of an NLP network and performs a kind of \textbf{feature extraction for words}.
+	\end{itemize}
+
+	\textbf{3 strategies:}
+	\begin{enumerate}[leftmargin=*]
+		\item \textbf{Train from scratch} -- learn the embedding on a given dataset for a given task. Result is \emph{specific} to that dataset/task.
+		\item \textbf{Use a pre-trained ``generic'' embedding} (word2vec, GloVe) and \textbf{freeze} the layer -- analogous to \textit{transfer learning}.
+		\item \textbf{Do both} -- initialise with pre-trained weights, then \textbf{fine-tune} during training.
+	\end{enumerate}
+
 	\begin{examtipbox}
-		Embeddings are \emph{static} (one vector per word) -- contrast with contextual embeddings from Transformers. The embedding matrix is just a learnable lookup table of shape (vocab $\times$ dim).
+		Likely question: \emph{``Compare the three ways to use an embedding layer.''} Map each to transfer-learning terms: (1) random init + full training, (2) frozen pre-trained features, (3) pre-trained init + fine-tuning. Trade-off: scratch needs lots of task data; frozen is data-efficient but generic; fine-tuning balances both.
+	\end{examtipbox}
+
+	\subsection{Embedding Layer in Keras}
+
+	Sentiment analysis on movie reviews (vocab = 5000 top words, embedding dim = 32):
+\begin{verbatim}
+top_words = 5000
+embedding_vector_length = 32
+model = Sequential()
+model.add(Embedding(top_words, embedding_vector_length,
+                    input_length=max_review_length))
+model.add(LSTM(100))
+model.add(Dense(1, activation='sigmoid'))
+model.compile(loss='binary_crossentropy', optimizer='adam',
+              metrics=['accuracy'])
+\end{verbatim}
+
+	\textbf{\texttt{Embedding} takes 3 arguments:}
+	\begin{enumerate}[leftmargin=*, nosep]
+		\item \textbf{input dim} = vocabulary size ($V$, here $5000$).
+		\item \textbf{output dim} = embedding vector dimension ($N$, here $32$).
+		\item \textbf{input length} = length of input sequences (here a review of $500$ words).
+	\end{enumerate}
+
+	\begin{center}
+	\begin{tabular}{llr}
+		\toprule
+		Layer & Output shape & Params \\
+		\midrule
+		Embedding & (None, 500, 32) & $5000\times 32 = 160000$ \\
+		LSTM(100) & (None, 100)     & $4\cdot 100(100{+}32{+}1) = 53200$ \\
+		Dense(1, sigmoid) & (None, 1) & $1(100{+}1) = 101$ \\
+		\midrule
+		\textbf{Total} & & \textbf{213\,301} \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Embedding params} $= V \times N$ (a lookup table, no bias). Here $5000\times 32 = 160\,000$. The output keeps the time axis: \texttt{(batch, seq\_len, N)}.
+	\end{importantbox}
+
+	\begin{examtipbox}
+		Examiner favourite: \emph{count the parameters}. Embedding $= V\cdot N$ (\textbf{no} $+1$ bias, unlike Dense/LSTM). Pre-trained word2vec/GloVe weights can be loaded instead of training from scratch.
+	\end{examtipbox}
+
+	\subsection{Word2Vec -- Principles}
+
+	\begin{definitionbox}
+		\textbf{word2vec} produces word embeddings with \textbf{contextual similarity}: words that share a common \emph{context} are placed close together in the embedding space.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Hypothesis 1 (distributional):} a word is represented by its \textbf{context} (the surrounding words). \\
+		E.g.\ \texttt{apple} and \texttt{orange} both occur in ``I eat an \_\_\_ every day'' $\Rightarrow$ they end up close together.
+		\item \textbf{Hypothesis 2 (bag-of-words):} the \textbf{order/position} of context words is \emph{disregarded}. A window is taken around the target word; words in the window are dropped into a ``bag'' regardless of order.
+	\end{itemize}
+
+	\begin{importantbox}
+		The bag-of-words assumption means word2vec embeddings are \textbf{static} (one vector per word, position-independent). Transformers re-introduce order via \textbf{positional encoding}.
+	\end{importantbox}
+
+	\subsection{Word2Vec -- Training Strategies}
+
+	Three model variants, all building on the basic \textbf{one-word-context} idea:
+	\begin{center}
+	\begin{tabular}{lll}
+		\toprule
+		Model & Idea & Multi-word extension \\
+		\midrule
+		One-word context & predict 1 word from 1 word & baseline (educational only) \\
+		\textbf{Skip-gram} & predict \emph{context} from center word & multi-word at the \textbf{output} \\
+		\textbf{CBOW} & predict \emph{center} word from context & multi-word at the \textbf{input} \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{One-word context}: not really used in practice -- mainly for explaining the mechanism.
+		\item \textbf{Skip-gram}: input = 1 word, output = many context words.
+		\item \textbf{CBOW} (Continuous Bag-of-Words): input = many context words, output = 1 center word.
+		\item \textbf{Negative sampling} makes training tractable (avoids the full softmax over $V$).
+	\end{itemize}
+
+	\begin{importantbox}
+		Mnemonic: \textbf{Skip-gram} expands the \textbf{output} (one $\to$ many context); \textbf{CBOW} expands the \textbf{input} (many context $\to$ one). They are mirror images of each other.
+	\end{importantbox}
+
+	\subsection{Word2Vec -- One-Word-Context Model}
+
+	Architecture: $V \to N \to V$. Input 1-hot word $\to$ hidden (\textbf{linear}) $\to$ output (\textbf{softmax}) predicting the context word. Two weight matrices: $\mathbf{W}_{V\times N}$ (input) and $\mathbf{W}'_{N\times V}$ (output).
+
+	\begin{formulabox}
+		\textbf{1. Hidden layer} (row lookup, linear activation):
+		\[ \mathbf{h} = \mathbf{x}^{\top}\mathbf{W} := \mathbf{v}_{w_I} \]
+		\textbf{2. Output logit} for word $j$ (dot product with the $j$-th \emph{column} of $\mathbf{W}'$):
+		\[ u_j = \mathbf{v}'^{\,\top}_{w_j}\cdot \mathbf{h} \]
+		\textbf{3. Softmax} $\to$ probability of context word $w_j$ given input $w_I$:
+		\[ p(w_j \mid w_I) = y_j = \frac{\exp(u_j)}{\sum_{j'=1}^{V}\exp(u_{j'})} \]
+		\begin{itemize}[leftmargin=1.2em]
+			\item $\mathbf{v}_{w_I}$: \textbf{input} vector = row $I$ of $\mathbf{W}$ (the embedding of $w_I$).
+			\item $\mathbf{v}'_{w_j}$: \textbf{output} vector = column $j$ of $\mathbf{W}'$.
+			\item $V$: vocabulary size, \; $N$: embedding dim.
+		\end{itemize}
+	\end{formulabox}
+
+	\begin{importantbox}
+		Each word has \textbf{two} vectors: an input vector (in $\mathbf{W}$) and an output vector (in $\mathbf{W}'$). The \textbf{softmax denominator} sums over all $V$ words $\Rightarrow$ \textbf{CPU-expensive} for large vocabularies. This is exactly what \textbf{negative sampling} / hierarchical softmax avoid.
+	\end{importantbox}
+
+	\begin{examtipbox}
+		Know the three-step forward pass (lookup $\to$ dot product $\to$ softmax) and \emph{why} the full softmax is the bottleneck (denominator over $V$). Online demo: \texttt{ronxin.github.io/wevi/}.
+	\end{examtipbox}
+
+	\subsection{Word2Vec -- Skip-Gram Model}
+
+	\begin{itemize}[leftmargin=*]
+		\item Extension of one-word-context to \textbf{multi-word context at the output layer}.
+		\item From a single input word, predict its \textbf{bag of $C$ context words} (e.g.\ from \texttt{apple} $\to$ \texttt{eat, an, every, day}).
+		\item Same hidden lookup as before: $\mathbf{h} = \mathbf{x}^{\top}\mathbf{W} := \mathbf{v}_{w_I}$.
+		\item The output matrix $\mathbf{W}'_{N\times V}$ is \textbf{shared} across all $C$ output positions $\Rightarrow$ every context slot uses the same softmax; output size is $C\times V$.
+	\end{itemize}
+
+	\begin{importantbox}
+		Skip-gram = \textbf{1 input $\to$ $C$ outputs}, with one shared $\mathbf{W}'$. Because $\mathbf{W}'$ is shared and order is ignored (bag-of-words), the $C$ predicted distributions are identical -- training pushes them toward the actual context words.
+	\end{importantbox}
+
+	\subsection{Word2Vec -- CBOW (Continuous Bag of Words)}
+
+	\begin{itemize}[leftmargin=*]
+		\item Extension of one-word-context to \textbf{multi-word context at the input layer} (mirror of skip-gram).
+		\item From a \textbf{bag of $C$ context words}, predict the single center word (e.g.\ \texttt{eat, an, every, day} $\to$ \texttt{apple}).
+		\item The input matrix $\mathbf{W}_{V\times N}$ is \textbf{shared} across all $C$ input words; the hidden layer is their \textbf{average}.
+	\end{itemize}
+
+	\begin{formulabox}
+		Hidden = average of the context word vectors:
+		\[
+		\mathbf{h} = \frac{1}{C}\,\mathbf{W}^{\top}(\mathbf{x}_1 + \mathbf{x}_2 + \dots + \mathbf{x}_C)
+		      = \frac{1}{C}\big(\mathbf{v}_{w_1} + \mathbf{v}_{w_2} + \dots + \mathbf{v}_{w_C}\big)^{\top}
+		\]
+		\begin{itemize}[leftmargin=1.2em]
+			\item $C$: number of context words, \; $\mathbf{x}_c$: 1-hot of context word $c$.
+			\item $\mathbf{v}_{w_c}$: input embedding (row of $\mathbf{W}$) of context word $c$.
+		\end{itemize}
+	\end{formulabox}
+
+	\begin{importantbox}
+		\textbf{CBOW vs Skip-gram} (mirror images):
+		\begin{itemize}[leftmargin=1.2em, nosep]
+			\item \textbf{CBOW}: $C$ inputs $\to$ 1 output; $\mathbf{h}$ = \emph{average} of context vectors. Faster, better on frequent words.
+			\item \textbf{Skip-gram}: 1 input $\to$ $C$ outputs; shared $\mathbf{W}'$. Slower, better on rare words \& small corpora.
+		\end{itemize}
+	\end{importantbox}
+
+	\subsection{Word2Vec -- Application Question}
+
+	\begin{examtipbox}
+		\textbf{Q: Could we use word2vec for word prediction in a search-engine keyword completion?}
+
+		\textbf{A: Not directly / not a good fit.} Keyword completion is \emph{next-word prediction}, which is inherently \textbf{order-dependent} (``new york \_\_\_'' $\to$ ``times'', ``weather''). word2vec rests on the \textbf{bag-of-words} assumption: it \emph{disregards word order and position}, so it cannot model the sequential dependency a completion task needs.
+		\begin{itemize}[leftmargin=1.2em, nosep]
+			\item word2vec is trained to learn \textbf{embeddings}, not to be a \textbf{language model}; its softmax outputs context-symmetric probabilities, not ordered continuations.
+			\item CBOW averages context (order lost); skip-gram predicts a bag (order lost) -- neither captures ``what comes \emph{next}''.
+			\item \textbf{Better tools}: a sequence model (RNN/LSTM, $n$-gram LM, or Transformer) that respects order.
+			\item \textbf{But}: word2vec embeddings are still useful as the \emph{input representation} (embedding layer) feeding such a model.
+		\end{itemize}
+	\end{examtipbox}
+
+	\subsection{Word2Vec -- Softmax Bottleneck \& Solutions}
+
+	\begin{importantbox}
+		The full softmax (and its derived update rules) must \textbf{iterate over the entire vocabulary} $V$ at every step. \textbf{Impractical} when $V$ and the training corpus are large -- which is almost always the case.
+	\end{importantbox}
+
+	\textbf{Two solutions:}
+	\begin{center}
+	\begin{tabular}{p{0.42\linewidth} p{0.42\linewidth}}
+		\toprule
+		\textbf{Hierarchical Softmax} & \textbf{Negative Sampling} \\
+		(Morin \& Bengio, 2005) & (Mikolov et al., 2013) \\
+		\midrule
+		Build a \textbf{binary tree} over the output layer; cost per update $\propto \log_2 V$ instead of $V$. &
+		Update only a \textbf{small sample} of outputs (the true word + a few ``negative'' words) instead of all $V$. \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{examtipbox}
+		Know \emph{why} the softmax is the bottleneck (normaliser sums over all $V$) and \emph{name both fixes}: hierarchical softmax ($\log V$ via a binary tree) and negative sampling (subsample negatives). Negative sampling is the more common in practice.
+	\end{examtipbox}
+
+	\subsection{Word2Vec -- Geometric Operations}
+
+	\begin{itemize}[leftmargin=*]
+		\item word2vec does more than cluster related words: it preserves \textbf{``path meaning''} -- the \emph{vector difference} between two words encodes a consistent semantic relationship.
+		\item The same offset is reused across many word pairs:
+	\end{itemize}
+	\begin{center}
+	\begin{tabular}{ll}
+		\toprule
+		Relationship & Parallel offset (example) \\
+		\midrule
+		Male--Female & $\mathrm{king}\!\to\!\mathrm{queen}$, $\mathrm{man}\!\to\!\mathrm{woman}$ \\
+		Verb tense   & $\mathrm{walking}\!\to\!\mathrm{walked}$, $\mathrm{swimming}\!\to\!\mathrm{swam}$ \\
+		Country--Capital & $\mathrm{Spain}\!\to\!\mathrm{Madrid}$, $\mathrm{Japan}\!\to\!\mathrm{Tokyo}$ \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{formulabox}
+		Famous analogy property (king $-$ man $+$ woman $\approx$ queen):
+		\[
+		\mathbf{v}_{\text{woman}} + \big(\mathbf{v}_{\text{king}} - \mathbf{v}_{\text{man}}\big) \approx \mathbf{v}_{\text{queen}}
+		\]
+		\begin{itemize}[leftmargin=1.2em]
+			\item $\mathbf{v}_{\text{king}}-\mathbf{v}_{\text{man}}$: the ``royalty'' offset, added to \texttt{woman}.
+		\end{itemize}
+	\end{formulabox}
+
+	\begin{examtipbox}
+		Classic exam item: \emph{solve an analogy} via vector arithmetic, or \emph{explain why} embeddings allow it (consistent linear offsets for relationships). Nearest neighbour to $\mathbf{v}_{\text{king}}-\mathbf{v}_{\text{man}}+\mathbf{v}_{\text{woman}}$ is \texttt{queen}.
+	\end{examtipbox}
+
+	\subsection{GloVe -- Global Vectors for Word Representation}
+
+	\begin{definitionbox}
+		\textbf{GloVe} learns embeddings from \textbf{global corpus statistics}: not a pure ANN but a \textbf{statistical / count-based} approach -- dimensionality reduction of the \textbf{co-occurrence matrix} of word pairs.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item Factorises the global word \textbf{co-occurrence matrix} (how often two words appear together in context).
+		\item Embeddings relate to the \textbf{probability that two words co-occur}.
+		\item \textbf{word2vec and co-occurrence-based methods are actually related} -- both ultimately capture co-occurrence statistics (prediction-based vs.\ count-based views of the same signal).
+		\item Source: \texttt{nlp.stanford.edu/projects/glove}.
+	\end{itemize}
+
+	\begin{examtipbox}
+		\textbf{word2vec vs GloVe}: word2vec is \emph{prediction-based} (local context windows, trained like a neural net); GloVe is \emph{count-based} (global co-occurrence matrix factorisation). Both yield dense static embeddings and are theoretically linked.
+	\end{examtipbox}
+
+	\subsection{FastText}
+
+	\begin{definitionbox}
+		\textbf{FastText} (Facebook, 2016) extends word2vec by representing each word as a \textbf{bag of character $n$-grams (sub-words)} instead of an atomic token.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item Words are broken into \textbf{sub-word $n$-grams}. E.g.\ tri-grams of \texttt{apple} $\to$ \texttt{app}, \texttt{ppl}, \texttt{ple}.
+		\item A word's embedding = \textbf{sum of its $n$-gram embeddings}.
+		\item After training we have embeddings for all $n$-grams of the training set (not just whole words).
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{Main advantage: out-of-vocabulary (OOV) words can still be represented} -- their $n$-grams likely appeared in other training words, so an unseen word still gets a vector.
+		\begin{itemize}[leftmargin=1.2em, nosep]
+			\item Useful for \textbf{company names} (\texttt{creativeinfotech} lands near IT concepts).
+			\item Useful for \textbf{compound-word languages} (e.g.\ German).
+		\end{itemize}
+	\end{importantbox}
+
+	\begin{examtipbox}
+		Likely question: \emph{``How does FastText handle OOV words / why is it better than word2vec for rare or compound words?''} Answer: sub-word $n$-grams shared across words $\Rightarrow$ unseen words composed from known $n$-grams.
+	\end{examtipbox}
+
+	\subsection{ELMo -- Contextual Embeddings}
+
+	\begin{definitionbox}
+		\textbf{ELMo} produces \textbf{contextual} embeddings: the vector of a word depends on the \emph{whole sentence}, not a fixed lookup. The same word gets \emph{different} embeddings in different contexts.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Intuition}: meaning changes with context. ``The \textit{plane} took off'' vs.\ ``the \textit{plane} surface'' vs.\ ``\textit{plane} geometry'' -- \texttt{plane} should get different vectors.
+		\item Unlike word2vec/GloVe (one \textbf{fixed} vector per word), ELMo reads the \textbf{entire sentence} before assigning each word's embedding.
+		\item Built from a \textbf{deep bidirectional LSTM language model (biLM)}: forward + backward LSTMs; the embedding $T_i$ is a learned combination of the hidden states.
+		\item The term ``word embedding'' gives way to \textbf{``language models''}.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{Static vs Contextual:}
+		\begin{itemize}[leftmargin=1.2em, nosep]
+			\item word2vec / GloVe / FastText $\Rightarrow$ \textbf{static} (one vector per word, context-free).
+			\item ELMo / Transformers (BERT, \dots) $\Rightarrow$ \textbf{contextual} (vector depends on the sentence) $\Rightarrow$ resolves \textbf{polysemy}.
+		\end{itemize}
+	\end{importantbox}
+
+	\begin{examtipbox}
+		Examiner favourite: \emph{``Why can't word2vec distinguish the senses of \textnormal{\texttt{plane}}?''} Because it is static/context-free. ELMo (deep biLSTM LM) solves this by conditioning each embedding on the full sentence.
+	\end{examtipbox}
+
+	\subsection{Wrap-up -- Comparison of Embeddings}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Word embedding} = projection of a word into a vector of real numbers.
+		\item \textbf{3 strategies} to use an embedding layer: train from scratch, frozen pre-trained, or pre-trained init + fine-tune.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tabular}{llp{0.42\linewidth}}
+		\toprule
+		Method & Type & Key idea \\
+		\midrule
+		\textbf{word2vec} & static & preserves contextual similarity via local context windows \\
+		\textbf{GloVe}    & static & similar, but from global co-occurrence statistics \\
+		\textbf{FastText} & static & sub-word $n$-grams $\Rightarrow$ handles \textbf{OOV} words \\
+		\textbf{ELMo}     & contextual & uses the whole sentence before embedding each word \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{ELMo and Transformers} (BERT, \dots) were the foundation ideas for recent breakthrough language models -- the shift from \emph{static embeddings} to \emph{contextual language models}.
+	\end{importantbox}
+
+	\subsection{Exam Tips}
+
+	\begin{examtipbox}
+		Embeddings are \emph{static} (one vector per word) -- contrast with contextual embeddings from ELMo/Transformers. The embedding matrix is just a learnable lookup table of shape (vocab $\times$ dim).
 	\end{examtipbox}
 	
 	% ==================================================
