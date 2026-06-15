@@ -15,6 +15,8 @@
 \usepackage{multicol}
 \usepackage{booktabs}
 \usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
 \usepackage{hyperref}
 \usepackage{parskip}
 \usepackage{microtype}
@@ -1168,6 +1170,102 @@ Static (Word2Vec, GloVe): one fixed vector per word regardless of context. Conte
 Linear relationships emerge, e.g.\ $\text{vec(king)}-\text{vec(man)}+\text{vec(woman)}\approx\text{vec(queen)}$ -- directions in the space encode semantic relations like gender.
 \end{answerbox}
 
+\q \textbf{(a)} How can you define a generative system? Describe the two approaches seen in class to build generative systems with RNNs.
+\begin{answerbox}
+A \emph{generative system} learns the data distribution $p(x)$ (or $p(x\mid c)$) so it can \emph{sample new data} that resembles the training set, rather than only predicting a label $p(y\mid x)$ as a discriminative model does.
+
+Two RNN-based approaches:
+\begin{itemize}[leftmargin=*,nosep]
+\item \textbf{Character/token-level autoregressive RNN.} Train the RNN to predict the next symbol given the previous ones, modelling $p(x_t\mid x_{1:t-1})$ via softmax. To generate: feed a seed, sample the next token, feed it back as input, and repeat (teacher forcing at train time, feedback loop at generation time).
+\item \textbf{Sequence-to-sequence (encoder--decoder) RNN.} An encoder RNN compresses an input/condition into a context vector; a decoder RNN generates the output sequence autoregressively from it. This produces \emph{conditional} samples (e.g.\ translation, image captioning).
+\end{itemize}
+\end{answerbox}
+
+\q \textbf{(b)} How can you define a generative system for sequence data? Describe the two approaches seen in class to build generative systems for sequence data.
+\begin{answerbox}
+A generative system for sequence data models the joint distribution of a sequence, factorised autoregressively as $p(x_{1:T})=\prod_t p(x_t\mid x_{1:t-1})$, so that new sequences can be sampled one element at a time.
+
+Two approaches:
+\begin{itemize}[leftmargin=*,nosep]
+\item \textbf{Unconditional autoregressive generation:} a single RNN predicts the next element; sampling and feeding back generates a free-running sequence (e.g.\ text/music generation from a seed).
+\item \textbf{Conditional generation with Seq2Seq:} an encoder turns an input sequence into a context, and a decoder generates the target sequence conditioned on it (e.g.\ machine translation, summarisation).
+\end{itemize}
+\textit{(Same two ideas as in (a), now stated explicitly for the sequence case.)}
+\end{answerbox}
+
+\q \textbf{(c)} Give two desired properties of word embeddings when used in a classification task (e.g.\ sentiment classification).
+\begin{answerbox}
+\begin{itemize}[leftmargin=*,nosep]
+\item \textbf{Semantic similarity / generalisation:} words with similar meaning have nearby vectors (small cosine distance), so the classifier generalises to words unseen with a given label.
+\item \textbf{Low, dense, fixed dimensionality:} a compact dense vector (vs.\ sparse one-hot) reduces parameters and overfitting and captures shared features.
+\end{itemize}
+\textit{(Also acceptable: task-discriminative / linearly separable for the labels, and capturing relevant relations such as polarity.)}
+\end{answerbox}
+
+\q \textbf{(d)} What are the three strategies to use an embedding layer in a deep system?
+\begin{answerbox}
+\begin{enumerate}[leftmargin=*,nosep,label=\arabic*.]
+\item \textbf{Train from scratch:} randomly initialise the embedding layer and learn it jointly with the task (good with a large labelled dataset).
+\item \textbf{Use pretrained, frozen:} load pretrained vectors (Word2Vec/GloVe/FastText) and keep them fixed -- only the rest of the network trains (good with little data).
+\item \textbf{Use pretrained, fine-tuned:} initialise with pretrained vectors but let them update during training (best when you have enough data to adapt them to the task).
+\end{enumerate}
+\end{answerbox}
+
+\q \textbf{(f)} What is the difference between Word2Vec and FastText?
+\begin{answerbox}
+Word2Vec treats each word as an \emph{atomic} unit -- one vector per word in the vocabulary -- so it cannot represent out-of-vocabulary words and ignores morphology. FastText represents a word as the \emph{sum of its character $n$-gram (subword) embeddings}, so it shares parameters across morphologically related words and can build vectors for unseen/rare words and misspellings. FastText is better for morphologically rich languages; Word2Vec is lighter.
+\end{answerbox}
+
+\q \textbf{(g)} \textit{Optional (ex.\ 3).} Draw the architecture of a Seq2Seq model and explain the encoder/decoder concept.
+\begin{answerbox}
+\textbf{Encoder:} an RNN (often LSTM/GRU) reads the input sequence and compresses it into a fixed-size \emph{context vector} (its final hidden state). \textbf{Decoder:} a second RNN is initialised with that context and generates the output sequence one token at a time, feeding each predicted token back as the next input until \texttt{<eos>}.
+
+\begin{center}
+\begin{tikzpicture}[
+    node distance=7mm and 8mm,
+    enc/.style={draw,rounded corners,minimum height=8mm,minimum width=8mm,fill=blue!8},
+    dec/.style={draw,rounded corners,minimum height=8mm,minimum width=8mm,fill=orange!12},
+    >={Stealth[round]}, font=\footnotesize]
+% encoder cells
+\node[enc] (e1) {$h_1$};
+\node[enc,right=of e1] (e2) {$h_2$};
+\node[enc,right=of e2] (e3) {$h_3$};
+% context
+\node[draw,ellipse,fill=green!12,right=of e3] (c) {context};
+% decoder cells
+\node[dec,right=of c] (d1) {$s_1$};
+\node[dec,right=of d1] (d2) {$s_2$};
+\node[dec,right=of d2] (d3) {$s_3$};
+% inputs
+\node[below=of e1] (x1) {$x_1$};
+\node[below=of e2] (x2) {$x_2$};
+\node[below=of e3] (x3) {$\langle\text{eos}\rangle$};
+% outputs
+\node[above=of d1] (y1) {$y_1$};
+\node[above=of d2] (y2) {$y_2$};
+\node[above=of d3] (y3) {$\langle\text{eos}\rangle$};
+% edges
+\draw[->] (x1)--(e1); \draw[->] (x2)--(e2); \draw[->] (x3)--(e3);
+\draw[->] (e1)--(e2); \draw[->] (e2)--(e3); \draw[->] (e3)--(c);
+\draw[->] (c)--(d1); \draw[->] (d1)--(d2); \draw[->] (d2)--(d3);
+\draw[->] (d1)--(y1); \draw[->] (d2)--(y2); \draw[->] (d3)--(y3);
+% feedback of generated tokens
+\draw[->,dashed] (y1) to[bend left=35] (d2);
+\draw[->,dashed] (y2) to[bend left=35] (d3);
+\node[below=2mm of e2,font=\scriptsize\itshape] {encoder};
+\node[below=2mm of d2,font=\scriptsize\itshape] {decoder};
+\end{tikzpicture}
+\end{center}
+\textit{Dashed arrows = the previous output token fed back as the decoder's next input.}
+\end{answerbox}
+
+\q \textbf{(h)} \textit{Optional (ex.\ 3).} What is the main problem of a basic Seq2Seq model used for machine translation, and the solution to overcome it?
+\begin{answerbox}
+\textbf{Problem -- the fixed-size context bottleneck:} the whole source sentence must be squeezed into one context vector. For long sentences this loses information and translation quality degrades sharply.
+
+\textbf{Solution -- attention:} instead of a single context, the decoder computes at \emph{each} output step a weighted combination of \emph{all} encoder hidden states, focusing on the relevant source words. This removes the bottleneck, handles long sequences, and yields soft alignments between source and target words.
+\end{answerbox}
+
 \end{enumerate}
 
 % ==================================================
@@ -1258,6 +1356,7 @@ VAE: stable training, principled latent space, but blurrier samples. GAN: sharp 
 \end{answerbox}
 
 \end{enumerate}
+
 
 \newpage
 % ==================================================
