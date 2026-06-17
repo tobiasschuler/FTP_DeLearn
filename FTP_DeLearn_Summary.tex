@@ -2295,33 +2295,366 @@ model.compile(loss='binary_crossentropy', optimizer='adam',
 	% ==================================================
 	\section{Non-Seq Architectures, Transfer Learning, Autoencoders, SSL}
 	% ==================================================
-	
-	\subsection{Transfer Learning}
-	
+
+	\subsection{Keras Models -- Sequential vs Functional}
+
 	\begin{definitionbox}
-		Reuse a model pre-trained on a large source task; \textbf{fine-tune} it on a smaller target task. Saves data and compute.
+		\textbf{Sequential model}: a plain linear \emph{stack} of layers (one input $\to$ one output). \\
+		\textbf{Functional API}: build models as a \emph{computational graph} of layers $\Rightarrow$ needed for any \textbf{non-sequential} architecture.
 	\end{definitionbox}
-	
+
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{Feature extraction}: freeze backbone, train a new head.
-		\item \textbf{Fine-tuning}: unfreeze some/all layers with a small learning rate.
+		\item The functional API enables:
+		\begin{itemize}
+			\item \textbf{Multiple paths} in the computation graph (incl.\ \textbf{layer sharing} -- same layer reused on several inputs).
+			\item \textbf{Multiple inputs} and \textbf{multiple outputs}.
+		\end{itemize}
+		\item A layer is defined by: connection type, \# of units, with/without bias, activation type.
 	\end{itemize}
-	
-	\subsection{Autoencoders}
-	
+
+	\begin{center}
+		\begin{tabular}{@{}lll@{}}
+			\toprule
+			& \textbf{Sequential} & \textbf{Functional} \\
+			\midrule
+			Topology      & linear stack        & arbitrary DAG \\
+			Inputs/Outputs & single / single    & multiple / multiple \\
+			Layer sharing & no                  & yes \\
+			Use case      & simple MLP/CNN      & branches, skip/residual, multi-task \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{examtipbox}
+		``When do you \emph{need} the functional API?'' $\to$ whenever the graph is not a single chain: shared layers, residual/skip connections, or multi-input/multi-output (multi-task) models. A Sequential model cannot express these.
+	\end{examtipbox}
+
+	\subsection{RECAP: MLP with Sequential -- Parameter Counting}
+
+	\begin{itemize}[leftmargin=*]
+		\item Layers added one after another; the \textbf{last added layer = output layer}.
+		\item Typical 2-layer classifier: \texttt{InputLayer(D)} $\to$ \texttt{Dense(H, relu)} $\to$ \texttt{Dense(K, softmax)}.
+	\end{itemize}
+
 	\begin{formulabox}
+		Trainable params of a \texttt{Dense} layer (weights $+$ bias):
 		\[
-		z = \mathrm{enc}(x), \qquad \hat x = \mathrm{dec}(z), \qquad
-		\mathcal{L} = \|x - \hat x\|^2
+		\#\text{params} = (n_{\text{in}} \times n_{\text{out}}) + n_{\text{out}}
 		\]
 	\end{formulabox}
-	
 	\begin{itemize}[leftmargin=*]
-		\item Learn a compressed latent code $z$ (bottleneck).
-		\item Variants: denoising, sparse, contractive autoencoders.
-		\item Uses: dimensionality reduction, anomaly detection, pretraining.
+		\item $n_{\text{in}}$: input features to the layer \quad $n_{\text{out}}$: units in the layer ($+n_{\text{out}}$ = one bias per unit).
+		\item Example ($D=784$, $H=300$, $K=10$): layer 1 $=784\cdot300+300=235{,}500$; layer 2 $=300\cdot10+10=3{,}010$; total $=238{,}510$.
 	\end{itemize}
+
+	\begin{examtipbox}
+		\textbf{Examiner favorite:} ``How many parameters does this layer/model have?'' Don't forget the \textbf{bias term} ($+n_{\text{out}}$). Output shape \texttt{(None, H)}: \texttt{None} = variable batch size.
+	\end{examtipbox}
+
+	\subsection{Functional API -- MLP Example}
+
+	\begin{importantbox}
+		\textbf{Callable (pairwise) syntax}: each layer is called on the tensor it takes input from $\to$ \texttt{layer\_out = Layer(...)(prev\_tensor)}. The graph is wired explicitly, then a \texttt{Model(inputs, outputs)} ties the input/output tensors together.
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \texttt{visible = Input(shape=(D,))} -- input tensor declared explicitly.
+		\item \texttt{hidden1 = Dense(H,'relu')(visible)} \quad \texttt{output = Dense(K,'softmax')(hidden1)}.
+		\item \texttt{model = Model(inputs=visible, outputs=output)}.
+		\item Input \textbf{shape tuple has a hanging last comma} for 1-D input: \texttt{(784,)} -- leaves room for the (implicit) mini-batch dimension.
+		\item Same architecture as Sequential $\Rightarrow$ \textbf{identical parameter count} (238{,}510); only the explicit \texttt{InputLayer} appears (0 params).
+		\item \textbf{Why this works:} a Python object is \emph{callable} (usable as \texttt{obj()}) when its class defines \texttt{\_\_call\_\_}; a Keras \texttt{Layer} implements it, so \texttt{Layer(...)(tensor)} = build layer, then call it on the tensor.
+	\end{itemize}
+
+	\begin{examtipbox}
+		Know the \textbf{three steps}: (1) \texttt{Input(...)}, (2) wire layers with callable syntax, (3) \texttt{Model(inputs, outputs)}. Pitfall: forgetting to call each layer on its predecessor, or writing \texttt{(784)} instead of \texttt{(784,)} (latter is a tuple).
+	\end{examtipbox}
+
+	\subsection{Multi-Path CNN (Functional API)}
+
+	\begin{definitionbox}
+		\textbf{Idea:} run \textbf{different filter sizes at the same stage} on the \emph{same} input, then merge. Different kernel sizes capture patterns of different scales $\Rightarrow$ handles \textbf{close and far objects} in one image.
+	\end{definitionbox}
+
+	\begin{center}
+		\begin{tikzpicture}[
+			font=\footnotesize,
+			node distance=5mm and 9mm,
+			box/.style={draw, rounded corners, minimum height=6mm, inner sep=3pt, align=center},
+			>={Stealth[round]}]
+			\node[box] (in) {\texttt{Input} (28,28,1)};
+			\node[box, below left=8mm and 4mm of in] (c1) {Conv2D $k{=}3$};
+			\node[box, below right=8mm and 4mm of in] (c2) {Conv2D $k{=}6$};
+			\node[box, below=of c1] (b1) {Dropout$\to$Pool$\to$Flatten};
+			\node[box, below=of c2] (b2) {Dropout$\to$Pool$\to$Flatten};
+			\node[box, below=14mm of in] (cat) {\texttt{concatenate}};
+			\node[box, below=of cat] (h) {Dense(100, relu)};
+			\node[box, below=of h] (out) {Dense(10, softmax)};
+			\draw[->] (in) -- (c1);
+			\draw[->] (in) -- (c2);
+			\draw[->] (c1) -- (b1);
+			\draw[->] (c2) -- (b2);
+			\draw[->] (b1) -- (cat);
+			\draw[->] (b2) -- (cat);
+			\draw[->] (cat) -- (h);
+			\draw[->] (h) -- (out);
+		\end{tikzpicture}
+	\end{center}
+
+	\begin{itemize}[leftmargin=*]
+		\item Both branches read the \textbf{same input tensor} \texttt{visible}: \texttt{conv1=...(visible)}, \texttt{conv2=...(visible)}.
+		\item Each branch: \texttt{Conv2D $\to$ Dropout $\to$ MaxPooling2D $\to$ Flatten}.
+		\item Merge: \texttt{merge = concatenate([flat1, flat2])} $\to$ Dense(100) interpretation $\to$ Dense(10, softmax).
+		\item This topology is \textbf{impossible in Sequential} (a branch + merge) -- requires the functional API.
+	\end{itemize}
+
+	\begin{examtipbox}
+		``Why mix filter sizes at the same stage?'' $\to$ multi-scale feature capture. Know that \textbf{branches must flatten to compatible shapes before \texttt{concatenate}}, and that the merge node is what makes this non-sequential.
+	\end{examtipbox}
+
+	\subsection{Multi-Feature CNN (features from different stages)}
+
+	\begin{definitionbox}
+		\textbf{Idea:} mix features from \textbf{different depths/stages} of one CNN chain. Early stages capture low-level cues (texture, edges); later stages capture high-level shapes. Combining them helps fine discrimination (e.g.\ \emph{cat vs.\ leopard} via texture).
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item One deepening chain: \texttt{conv1$\to$pool1 $\to$ conv2$\to$pool2 $\to$ conv3$\to$pool3}.
+		\item \textbf{Tap each stage}: \texttt{flat1=Flatten(pool1)}, \texttt{flat2=Flatten(pool2)}, \texttt{flat3=Flatten(pool3)}.
+		\item Merge all depths: \texttt{concatenate([flat1, flat2, flat3])} $\to$ Dense(100) $\to$ Dense(10, softmax).
+	\end{itemize}
+
+	\begin{center}
+		\begin{tabular}{@{}lll@{}}
+			\toprule
+			& \textbf{Multi-path} & \textbf{Multi-feature} \\
+			\midrule
+			Branches feed from & same input        & successive stages (chain) \\
+			Varies             & filter \emph{size} per branch & feature \emph{depth} tapped \\
+			Captures           & multi-\emph{scale} & low- $+$ high-level features \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{examtipbox}
+		Don't confuse the two functional-API CNN patterns: \textbf{multi-path} = parallel branches with different kernel sizes on the same input; \textbf{multi-feature} = concatenate flattened outputs taken from \emph{different depths} of one chain. Both end in \texttt{concatenate} + Dense.
+	\end{examtipbox}
+
+	\subsection{Multiple Inputs (merging modalities)}
+
+	\begin{definitionbox}
+		\textbf{Idea:} feed \textbf{several independent inputs}, each through its own sub-network (tower), then \texttt{concatenate} the towers before the dense head. Used to \textbf{merge different modalities}.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item Each input has its own \texttt{Input(...)} + CNN tower; towers are flattened and concatenated.
+		\item Declared with a \textbf{list of inputs}: \texttt{Model(inputs=[in1, in2], outputs=output)}.
+		\item Use cases: multiple images of the same object (e.g.\ frames from a movie), \textbf{stereo} speech recording, different acquisition-device parameters.
+	\end{itemize}
+
+	\begin{examtipbox}
+		Distinguish from multi-path: here the branches have \textbf{separate inputs} (one per modality), not one shared input. Key syntax cue: \texttt{inputs=[...]} (a list).
+	\end{examtipbox}
+
+	\subsection{Famous Example: Inception Module \& GoogLeNet}
+
+	\begin{definitionbox}
+		\textbf{Inception module}: a \emph{multi-path} block that runs \textbf{$1{\times}1$, $3{\times}3$, $5{\times}5$ convolutions and $3{\times}3$ max-pooling in parallel} on the same input, then \texttt{concatenate}s the outputs along the channel axis. \\
+		\textbf{GoogLeNet} (Inception v1, ILSVRC'14 winner, 22 layers): a deep stack of Inception modules.
+	\end{definitionbox}
+
+	\begin{center}
+		\begin{tikzpicture}[
+			font=\footnotesize,
+			node distance=4mm and 5mm,
+			box/.style={draw, rounded corners, minimum height=5.5mm, inner sep=2.5pt, align=center},
+			>={Stealth[round]}]
+			\node[box] (in) {previous layer};
+			\node[box, below=10mm of in] (b2) {$1{\times}1$};
+			\node[box, left=of b2] (b1) {$1{\times}1$};
+			\node[box, right=of b2] (b3) {$1{\times}1$};
+			\node[box, right=of b3] (b4) {$3{\times}3$ pool};
+			\node[box, below=of b2] (c2) {$3{\times}3$};
+			\node[box, below=of b3] (c3) {$5{\times}5$};
+			\node[box, below=of b4] (c4) {$1{\times}1$};
+			\node[box, below=24mm of in] (cat) {\texttt{concatenate} (depth)};
+			\draw[->] (in) -- (b1); \draw[->] (in) -- (b2); \draw[->] (in) -- (b3); \draw[->] (in) -- (b4);
+			\draw[->] (b2) -- (c2); \draw[->] (b3) -- (c3); \draw[->] (b4) -- (c4);
+			\draw[->] (b1) -- (cat); \draw[->] (c2) -- (cat); \draw[->] (c3) -- (cat); \draw[->] (c4) -- (cat);
+		\end{tikzpicture}
+	\end{center}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Why non-sequential?} Parallel conv/pool branches merged by \texttt{concatenate} = a multi-path graph (cannot be a plain stack).
+		\item \textbf{$1{\times}1$ convolutions} = cheap dimensionality reduction (``bottleneck'') placed \emph{before} the $3{\times}3$/$5{\times}5$ convs $\Rightarrow$ slashes compute and parameters.
+		\item Multi-scale: different kernel sizes capture patterns at several scales in one block.
+		\item \textbf{GoogLeNet auxiliary classifiers}: 2 extra softmax \emph{outputs} branched off intermediate layers \emph{during training} $\Rightarrow$ a \textbf{multiple-output} graph; they fight vanishing gradients and are removed at inference.
+	\end{itemize}
+
+	\begin{examtipbox}
+		Inception = canonical \textbf{multi-path} architecture; GoogLeNet also uses \textbf{multiple outputs} (aux classifiers) -- so it exercises \emph{both} reasons the functional API exists. Remember the role of \textbf{$1{\times}1$ convs} (dimensionality reduction), an examiner favorite.
+	\end{examtipbox}
+
+	\subsection{RECAP: Conv Layers Extract Features}
+
+	\begin{importantbox}
+		Filter parameters are \textbf{learned}, so a CNN learns \emph{not only to classify but also to extract features}. \\
+		\textbf{Deep Learning $=$ representation learning $+$ downstream-task learning} -- feature extraction is learned end-to-end, unlike classical ML where features are hand-crafted.
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item Classical ML: separate hand-designed \emph{feature extraction} $\to$ then a model.
+		\item Deep learning: raw data $\to$ learned features (representation) $\to$ task head, all trained jointly.
+		\item \textbf{Transfer learning idea:} re-use the learned \emph{feature-extraction} part on a new task.
+	\end{itemize}
+
+	\subsection{Representation Learning}
+
+	\begin{definitionbox}
+		\textbf{Representation learning}: creating models that \emph{automatically extract relevant (often generic) features} of the input -- capturing underlying patterns \textbf{without manually designed features}.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item A DNN is a \textbf{two-stage} process: (1) learn useful \emph{representations}, (2) a simple transform into the target.
+		\item Goal: map \textbf{high-dimensional complex input $\to$ low-dimensional} form capturing task-relevant properties.
+		\item Example: a classifier CNN learns to turn \textbf{non-linearly-separable} images into a low-dim representation where classes become \textbf{linearly separable}.
+	\end{itemize}
+
+	\subsection{Transfer Learning}
+
+	\begin{definitionbox}
+		\textbf{Transfer learning}: use knowledge learned on tasks with \textbf{lots of labelled data} to help settings where \textbf{little labelled data} is available -- concretely, \textbf{re-use the feature-extraction (``representation'') part} of a pre-trained network.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item Reuse a backbone on which years of engineering / huge data were spent; \textbf{fine-tune} on the smaller target task. Saves data and compute.
+		\item \textbf{Traditional ML}: generalise to unseen data from patterns in \emph{its own} training set.
+		\item \textbf{Transfer learning}: \emph{kickstart} generalisation by starting from patterns learned for a \emph{different} task -- works best when tasks are in the \textbf{same domain} (not too different).
+		\item Two regimes:
+		\begin{itemize}
+			\item \textbf{Feature extraction}: freeze backbone, train a new head.
+			\item \textbf{Fine-tuning}: unfreeze some/all layers with a \emph{small} learning rate.
+		\end{itemize}
+	\end{itemize}
+
+	\begin{examtipbox}
+		``Why does transfer learning help with little data?'' $\to$ the costly representation is already learned; you only fit a small head. Use a \textbf{small LR} when fine-tuning so pre-trained weights aren't destroyed. Best when source/target share a \textbf{domain}.
+	\end{examtipbox}
 	
+	\subsection{Transfer Learning -- Practical Recipe}
+
+	\begin{importantbox}
+		\textbf{Golden rule:} \emph{the more target data you have, the more layers you can (re)train.} Early layers learn \textbf{generic} features (edges/textures) $\to$ keep frozen; later layers are \textbf{task-specific} $\to$ retrain first.
+	\end{importantbox}
+
+	\begin{center}
+		\begin{tabular}{@{}p{2.3cm}p{5.5cm}p{6cm}@{}}
+			\toprule
+			\textbf{Scenario} & \textbf{What you do} & \textbf{Notes} \\
+			\midrule
+			Pre-trained model & Available model (e.g.\ trained on ImageNet) to reuse. & The starting point. \\
+			Small dataset \newline (\textbf{feature extractor}) & \textbf{Freeze all} conv layers; plug in a \textbf{fresh classifier head} and train \emph{only} that. & Features are fixed; head can even be a non-NN classifier (e.g.\ SVM). \\
+			Medium dataset \newline (\textbf{fine-tuning}) & Freeze \emph{early} layers; \textbf{retrain later conv blocks $+$ head}. More data $\Rightarrow$ unfreeze more (up to all). & Often \textbf{2 phases}: (1) train the new head, (2) fine-tune the rest with a \textbf{small LR}. \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{examtipbox}
+		Likely Q: ``You have a small/medium dataset -- what do you freeze and train?'' Small $\to$ freeze backbone, train head only. Medium $\to$ also fine-tune upper layers with small LR. Why two phases? Training a random head with high gradients would otherwise wreck the pre-trained weights.
+	\end{examtipbox}
+
+	\subsection{Autoencoders -- Definition}
+
+	\begin{definitionbox}
+		An \textbf{autoencoder} is a neural network trained to \textbf{reproduce its own input}, thereby discovering ``structures'' and \textbf{efficient codings} of the input space. A class of \emph{representation learning}.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item Simplest form: a feedforward (non-recurrent) net like an MLP, with \textbf{output dimension $=$ input dimension}.
+		\item Trained so the mapping $h_\theta(\mathbf{x}) = \hat{\mathbf{x}} \approx \mathbf{x}$.
+		\item \textbf{No label targets} -- the teaching signal is the \emph{data itself} $\Rightarrow$ a form of \textbf{self-supervised learning}.
+	\end{itemize}
+
+	\begin{formulabox}
+		\[
+		\mathbf{z} = E_{\theta_E}(\mathbf{x}), \qquad
+		\hat{\mathbf{x}} = D_{\theta_D}(\mathbf{z}), \qquad
+		\hat{\mathbf{x}} = D_{\theta_D}\!\big(E_{\theta_E}(\mathbf{x})\big) = h_\theta(\mathbf{x})
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $E_{\theta_E}$: encoder \quad $D_{\theta_D}$: decoder \quad $\mathbf{z}$: latent \textbf{feature / representation} vector.
+	\end{itemize}
+
+	\begin{formulabox}
+		\textbf{Loss = MSE quadratic reconstruction error} (input vs.\ reconstructed input):
+		\[
+		J(\theta) = J(\theta_E,\theta_D) = \frac{1}{2N}\sum_{n=1}^{N}\big(h_\theta(\mathbf{x}_n) - \mathbf{x}_n\big)^2
+		= \frac{1}{2N}\sum_{n=1}^{N}\big(\hat{\mathbf{x}}_n - \mathbf{x}_n\big)^2
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item Trained like any net by \textbf{gradient descent}: \emph{full} (all $N$/iter), \emph{stochastic} (1/iter), \emph{batch} ($b$/iter).
+	\end{itemize}
+
+	\begin{center}
+		\begin{tikzpicture}[
+			font=\footnotesize, >={Stealth[round]},
+			n/.style={circle, draw, minimum size=5mm, inner sep=0pt},
+			every node/.style={}]
+			% input layer (4)
+			\foreach \i in {1,...,4} \node[n] (x\i) at (0,{4-\i}) {};
+			% latent (2)
+			\foreach \i in {1,2} \node[n, fill=black!8] (z\i) at (2.6,{2.5-\i}) {};
+			% output layer (4)
+			\foreach \i in {1,...,4} \node[n] (y\i) at (5.2,{4-\i}) {};
+			% encoder connections
+			\foreach \i in {1,...,4} \foreach \j in {1,2} \draw[->,gray] (x\i) -- (z\j);
+			% decoder connections
+			\foreach \j in {1,2} \foreach \i in {1,...,4} \draw[->,gray] (z\j) -- (y\i);
+			\node[above=1mm] at (0,3) {$\mathbf{x}$};
+			\node[above=1mm] at (2.6,1.7) {$\mathbf{z}$};
+			\node[above=1mm] at (5.2,3) {$\hat{\mathbf{x}}$};
+			\node at (1.3,-1.4) {\small Encoding $E_{\theta_E}$, $W_l$};
+			\node at (3.9,-1.4) {\small Decoding $D_{\theta_D}$, $W_l'$};
+		\end{tikzpicture}
+	\end{center}
+
+	\begin{importantbox}
+		Architecture must \textbf{prevent learning a trivial copy} (identity). Two ways:
+		\begin{itemize}
+			\item \textbf{Bottleneck} -- hidden layer \emph{smaller} than input (``\textbf{diabolo}'' / undercomplete net).
+			\item \textbf{More} hidden nodes but with \textbf{dropout} (regularised / overcomplete).
+		\end{itemize}
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item After training, \textbf{cut the net in two}: keep the \emph{encoder} to produce representations $\mathbf{z}$; the decoder reconstructs.
+		\item Variants: denoising, sparse, contractive autoencoders. Uses: dimensionality reduction, anomaly detection, pretraining.
+	\end{itemize}
+
+	\begin{examtipbox}
+		``Is an autoencoder supervised or unsupervised?'' $\to$ \emph{self-supervised}: no external labels, but the data is its own target. ``Why not just learn the identity?'' $\to$ the bottleneck (diabolo) or dropout forces it to compress. Know the encoder/decoder split and that $\mathbf{z}$ is the learned representation.
+	\end{examtipbox}
+
+	\subsection{Autoencoders -- Usages}
+
+	\begin{importantbox}
+		\textbf{Usage 1 -- Data compression / dimensionality reduction.} Train an AE on all data; send the \textbf{decoder weights $W_l'$} to the receiver once. Then \textbf{encode}: transmit only the lower-dim $\mathbf{z}$ (instead of $\mathbf{x}$); the receiver \textbf{decodes} $\hat{\mathbf{x}} = D(\mathbf{z})$.
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Link to PCA:} with \emph{linear} activations (or a single sigmoid hidden layer), the optimal AE solution relates to \textbf{Principal Component Analysis}.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{Usage 2 -- Encoder as feature extractor.} Train a (conv-)AE on your data \emph{including unlabelled} samples; keep the \textbf{encoder} to compute $\mathbf{z}$; use $\mathbf{z}$ as features to train a classifier on the \textbf{labelled} part. (Semi-supervised: leverages unlabelled data.)
+	\end{importantbox}
+
+	\begin{examtipbox}
+		``How is an autoencoder related to PCA?'' $\to$ linear AE $\approx$ PCA (learns the principal subspace). Usage 2 is the bridge to \textbf{transfer/self-supervised learning}: pretrain a representation on unlabelled data, then fit a small supervised head.
+	\end{examtipbox}
+
 	\subsection{Self-Supervised Learning}
 	
 	\begin{importantbox}
