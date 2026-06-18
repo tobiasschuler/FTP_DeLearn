@@ -1,4 +1,4 @@
-# CLAUDE.md — LaTeX Generation Guide for `prism`
+# CLAUDE.md — LaTeX Generation Guide
 
 Project-specific instructions for this repo. This builds **exam-summary documents**
 in LaTeX (see `FTP_DeLearn_Summary.tex`). When I paste lecture notes, convert them
