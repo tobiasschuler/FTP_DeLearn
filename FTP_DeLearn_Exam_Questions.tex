@@ -755,6 +755,22 @@ Attention lets each decoder step focus on the most relevant encoder positions. T
 The title reflects that the model drops recurrence and convolution entirely, relying only on attention (+ feed-forward layers). T/F: better parallelisation -- \textbf{True}; handles larger training sets -- \textbf{True}; has encoder and decoder like seq2seq -- \textbf{True}; decoder blocks have 2 layers -- \textbf{False} (a decoder block has \emph{three} sub-layers: masked self-attention, encoder--decoder cross-attention, feed-forward; the encoder block has two). \textbf{``Self''}-attention: tokens attend to other tokens \emph{within the same sequence} (Q, K, V all come from that sequence).
 \end{answerbox}
 
+\q In self-attention, what do the Query, Key and Value represent for each embedded token?
+\begin{answerbox}
+\textbf{Query (Q)}: the kind of information/features the current token is \emph{looking for}. \textbf{Key (K)}: the kind of information/features each token \emph{has to offer} (matched against queries). \textbf{Value (V)}: the actual information/features each token \emph{provides} (aggregated according to the attention weights). A query is compared to all keys to decide how much of each token's value to retrieve.
+\end{answerbox}
+
+\q What are the shapes of the projection matrices $W^Q, W^K, W^V$? Do their output dimensions have to be equal, and how do they compare to the embedding dimension?
+\begin{answerbox}
+With embedding dimension $d_{\text{model}}$, the projections map each token's embedding into query/key/value spaces:
+\[
+W^Q\in\mathbb{R}^{d_{\text{model}}\times d_k},\quad
+W^K\in\mathbb{R}^{d_{\text{model}}\times d_k},\quad
+W^V\in\mathbb{R}^{d_{\text{model}}\times d_v}.
+\]
+\textbf{Q and K must share the same dimension} $d_k$ -- the score $QK^\top$ is a dot product, which is only defined for equal-length vectors. \textbf{V may differ} ($d_v$): it is not dotted, only summed with the weights, so $d_v$ just sets the output size per head. \textbf{Vs the embedding}: $d_k, d_v$ are typically \emph{smaller}, usually $d_k=d_v=d_{\text{model}}/h$ for $h$ heads (e.g.\ $512/8=64$); concatenating the $h$ heads restores $d_{\text{model}}$. In the single-head case one often takes $d_k=d_v=d_{\text{model}}$.
+\end{answerbox}
+
 \end{enumerate}
 
 % --------------------------------------------------
@@ -1294,6 +1310,82 @@ SSL creates labels from the data itself (no human annotation) via a pretext task
 Pull representations of two augmented views of the same sample together while pushing apart views of different samples, so the encoder learns invariant, discriminative features (e.g.\ SimCLR).
 \end{answerbox}
 
+\q An autoencoder is used as a lossy \emph{compression} tool (encoder $\to$ small latent code $\to$ decoder). How could we evaluate its performance, both in terms of loss and in terms of gain of bandwidth?
+\begin{answerbox}
+\textbf{Two axes -- they trade off against each other.}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Loss / reconstruction quality} (how much information is lost):
+  reconstruction error on held-out data, e.g.\ MSE $\frac{1}{N}\sum\|x-\hat{x}\|^2$,
+  PSNR $=10\log_{10}(\mathrm{MAX}^2/\mathrm{MSE})$ or SSIM for images. Lower MSE / higher PSNR $=$ better fidelity.
+  \item \textbf{Gain of bandwidth / compression ratio} (how much we save):
+  $\text{CR}=\dfrac{\text{size of }x}{\text{size of latent code}}=\dfrac{\dim(x)}{\dim(z)}$
+  (or bits-original\,/\,bits-code if the code is quantised/entropy-coded). Higher $=$ more saving.
+\end{itemize}
+Report the pair together as a \textbf{rate--distortion curve}: sweep the latent size $\dim(z)$ and plot reconstruction error (distortion) vs.\ compression ratio (rate). The best model dominates -- lower distortion at the same rate. A single number hides the trade-off: a tiny code gives huge bandwidth gain but high loss.
+\end{answerbox}
+
+\q After training that autoencoder, are you now able to use the encoded features to train a simple SVM classifier?
+\begin{answerbox}
+Yes. The encoder maps each input to a compact latent vector $z=\mathrm{enc}(x)$; these $z$ are dense, low-dimensional \textbf{features} that can directly feed any downstream classifier. Procedure: (1) train the autoencoder unsupervised on (possibly unlabelled) data; (2) freeze the encoder and run the \emph{labelled} samples through it to get $\{(z_i,y_i)\}$; (3) train the SVM on $(z_i,y_i)$. This is the classic \emph{unsupervised pretraining / feature-extraction} use of an autoencoder: the bottleneck removes redundancy, so the SVM works in a smaller, better-conditioned space and needs fewer labels than training on raw $x$.
+\end{answerbox}
+
+\q (a) Why (or when) do we need the functional API of Keras?
+\begin{answerbox}
+The \texttt{Sequential} API only builds a plain stack: one input, one output, layers in a line. The \textbf{functional API} treats layers as callable functions on tensors, so it can express \emph{non-sequential} graphs: multiple inputs or outputs, branches that merge (concatenate/add), skip/residual connections, shared layers, and arbitrary DAGs (e.g.\ Inception, U-Net, siamese, multi-task heads). Use it whenever the topology is not a simple chain.
+\end{answerbox}
+
+\q (b) What are the benefits of using transfer learning?
+\begin{answerbox}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Less data needed} -- reuse features learned on a large source dataset, so the target task needs far fewer labelled samples.
+  \item \textbf{Faster training / less compute} -- start from good weights instead of random init; often only train a small head.
+  \item \textbf{Better generalisation} -- pretrained low-level features (edges, textures) are general and reduce overfitting on small targets.
+  \item \textbf{Higher final accuracy} when the source and target domains are related.
+\end{itemize}
+\end{answerbox}
+
+\q (c) What does \emph{freezing} mean in a transfer-learning strategy? What is the influence of the training-set size on freezing?
+\begin{answerbox}
+\textbf{Freezing} $=$ setting layers as non-trainable (\texttt{layer.trainable=False}): their weights are kept fixed during training, so gradients don't update them and they act as a fixed feature extractor. Influence of dataset size:
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Small target set} $\Rightarrow$ freeze \emph{most/all} of the backbone, train only the new head. Few parameters to fit $\Rightarrow$ less overfitting.
+  \item \textbf{Large target set} $\Rightarrow$ freeze \emph{little or nothing}; unfreeze (fine-tune) more layers with a small learning rate, because there is enough data to adapt the deeper, task-specific features safely.
+\end{itemize}
+Rule of thumb: the more (and the more domain-different) your data, the fewer layers you freeze.
+\end{answerbox}
+
+\q (d) What are the potential usages of auto-encoders?
+\begin{answerbox}
+Dimensionality reduction / compression; denoising (denoising AE); anomaly / outlier detection (high reconstruction error $=$ anomaly); unsupervised feature extraction \& pretraining; data generation (variational AE); missing-value imputation; representation learning / visualisation of the latent space.
+\end{answerbox}
+
+\q (e) In which situations would you use auto-encoders to extract features?
+\begin{answerbox}
+When you have \textbf{plenty of unlabelled data but few labels}, and want a compact unsupervised representation; when raw inputs are high-dimensional / redundant and you need denoising or dimensionality reduction before a downstream model; when there is \textbf{no suitable pretrained network} for your domain (e.g.\ sensor signals, medical/spectral data) so off-the-shelf transfer learning doesn't apply.
+\end{answerbox}
+
+\q (f) What are the principles of self-supervised learning?
+\begin{answerbox}
+\begin{itemize}[leftmargin=1.2em]
+  \item \textbf{Labels come from the data itself} -- no human annotation. A \emph{pretext task} is defined by hiding/transforming part of the data and asking the model to predict it (mask a word, predict rotation, fill a patch, contrast two views).
+  \item Solving the pretext task forces the encoder to learn \textbf{general, semantic representations}.
+  \item These representations are then \textbf{transferred} to the real (downstream) task, fine-tuned with the few available labels.
+\end{itemize}
+It is the unlabelled-data way to get the benefits of pretraining (basis of BERT, GPT, SimCLR).
+\end{answerbox}
+
+\q (g) When would you prefer auto-encoders or self-supervised learning instead of using pre-trained networks to extract features?
+\begin{answerbox}
+Use AE/SSL (train your own representation on your own unlabelled data) when:
+\begin{itemize}[leftmargin=1.2em]
+  \item Your \textbf{domain is far from the pretrained model's} source data (ImageNet $\neq$ ECG, radar, audio spectrograms, text in a niche language) -- transferred features wouldn't be relevant.
+  \item There is \textbf{no good pretrained model} for your modality/architecture.
+  \item You have \textbf{lots of unlabelled in-domain data} to exploit, but few labels.
+  \item You need a representation \emph{tailored} to your data distribution (e.g.\ anomaly detection).
+\end{itemize}
+Conversely, prefer a pre-trained network when a model trained on a large, \emph{similar} domain is available -- it is cheaper and usually stronger than training from scratch.
+\end{answerbox}
+
 \end{enumerate}
 
 % ==================================================
@@ -1327,6 +1419,71 @@ Self-attention is permutation-invariant -- it has no inherent notion of order. P
 They process all positions in parallel (RNNs are sequential), and they capture long-range dependencies directly via attention rather than through a decaying hidden state. This makes them faster to train and more scalable.
 \end{answerbox}
 
+\q Define a Seq2Seq model. What is special about the kind of mapping it learns?
+\begin{answerbox}
+A model that maps an input sequence to an output sequence of \emph{possibly different length}, where the \textbf{entire input must be read before} the target can start being predicted. Typical uses: machine translation, question-answering bots, grapheme-to-phoneme mapping.
+\end{answerbox}
+
+\q Describe the original RNN-based Seq2Seq architecture and what is passed between its two parts.
+\begin{answerbox}
+Two RNNs: an \textbf{encoder} reads the whole input and compresses it into a fixed-size \textbf{context vector} (its final hidden state $h_t$); a \textbf{decoder} is initialised with that context vector and generates the output token by token. In the original form, \emph{only the encoder's last state} is passed as the decoder's initial state.
+\end{answerbox}
+
+\q What other names are given to the context vector, and what is it supposed to represent?
+\begin{answerbox}
+A numerical summary of the meaning of the whole input sequence. When the inputs are words it is called a \textbf{sentence embedding} or \textbf{thought vector}.
+\end{answerbox}
+
+\q What are the \texttt{<BOS>} and \texttt{<EOS>} tokens for in a Seq2Seq decoder?
+\begin{answerbox}
+\texttt{<BOS>} (beginning of sentence) is the first input that kicks off decoding; the decoder generates autoregressively (feeding $y_{j-1}$ to predict $y_j$) until it emits \texttt{<EOS>} (end of sentence), which stops generation.
+\end{answerbox}
+
+\q In a Seq2Seq model, why can decoding not start before the whole input has been read?
+\begin{answerbox}
+The decoder is initialised from the encoder's context vector, which summarises the \emph{entire} source. Output tokens can depend on any part of the input (e.g.\ word order differs across languages), so a partial summary would be insufficient.
+\end{answerbox}
+
+\q Distinguish global from local attention.
+\begin{answerbox}
+\textbf{Global} attention uses \emph{all} encoder hidden states when forming the context; \textbf{local} attention uses only a \emph{subset} of them.
+\end{answerbox}
+
+\q List the steps that turn encoder states + the current decoder state into a context vector.
+\begin{answerbox}
+(1) \textbf{Score} each encoder state against the decoder state with an alignment/score function (e.g.\ dot product); (2) \textbf{softmax} the scores into an attention distribution (sums to 1); (3) \textbf{multiply} each encoder state by its weight (alignment vectors); (4) \textbf{sum} the alignment vectors into the context vector; (5) \textbf{feed} it to the decoder (Bahdanau 2015: concatenate with the hidden state).
+\end{answerbox}
+
+\q What does ``self'' mean in self-attention, and how does it differ from Seq2Seq attention?
+\begin{answerbox}
+Same \emph{objective} (an enhanced, context-aware representation), but self-attention looks only at inputs from the \emph{same sequence} -- not at states coming from another part of the model (e.g.\ the encoder). Hence ``self''.
+\end{answerbox}
+
+\q How are Q, K and V obtained, and what is a common misconception about them?
+\begin{answerbox}
+By projecting each input embedding with three learned matrices: $q_i=x_iW^Q$, $k_i=x_iW^K$, $v_i=x_iW^V$ (like three Dense layers without bias, weights shared across positions). Misconception: they are \emph{not} three different inputs -- in self-attention they are three projections of the \emph{same} input.
+\end{answerbox}
+
+\q What is the computational complexity of self-attention in the sequence length $n$, and why?
+\begin{answerbox}
+$O(n^2)$: every token attends to every other token, so the attention matrix has $n\times n$ entries. This motivates efficient/long-context variants.
+\end{answerbox}
+
+\q Compare the inner structure of a Transformer encoder module and a decoder module.
+\begin{answerbox}
+\textbf{Encoder}: self-attention + feed-forward. \textbf{Decoder}: \emph{masked} self-attention + encoder--decoder (cross) attention + feed-forward. The cross-attention layer plays the role of attention in classic Seq2Seq.
+\end{answerbox}
+
+\q Contrast encoder-only and decoder-only Transformer models.
+\begin{answerbox}
+\textbf{Encoder-only} (e.g.\ BERT): bidirectional, good for understanding/representation tasks. \textbf{Decoder-only} (e.g.\ GPT): causal/autoregressive (masked self-attention), good for generation. Pre-trained sub-parts can be used alone.
+\end{answerbox}
+
+\q Why is multi-head attention used instead of a single attention function?
+\begin{answerbox}
+Several attention heads run in parallel and are concatenated, letting the model attend to different relations/subspaces simultaneously (loosely analogous to multiple filters in a CNN).
+\end{answerbox}
+
 \end{enumerate}
 
 % ==================================================
@@ -1353,6 +1510,51 @@ $\min_G\max_D \mathbb{E}_x[\log D(x)] + \mathbb{E}_z[\log(1-D(G(z)))]$. Mode col
 \q Compare VAEs, GANs, and diffusion models on sample quality, stability, and speed.
 \begin{answerbox}
 VAE: stable training, principled latent space, but blurrier samples. GAN: sharp samples, unstable training, prone to mode collapse. Diffusion: highest quality and stable, but slow sampling (many denoising steps).
+\end{answerbox}
+
+\q In a diffusion model, which process is fixed and which is learned?
+\begin{answerbox}
+The \textbf{forward} process $q(x_t|x_{t-1})$ is \textbf{fixed} (no parameters) -- it just adds Gaussian noise according to the schedule. The \textbf{reverse} process $p_\theta(x_{t-1}|x_t)$ is \textbf{learned} by a neural network -- it denoises step by step. Trap: swapping the two.
+\end{answerbox}
+
+\q Write a single forward (noising) step of a diffusion model.
+\begin{answerbox}
+$x_t=\sqrt{1-\beta_t}\,x_{t-1}+\sqrt{\beta_t}\,\epsilon$ with $\epsilon\sim\mathcal{N}(0,\mathbf{1}_d)$, i.e.\ the Gaussian kernel $q(x_t|x_{t-1})=\mathcal{N}(x_t;\sqrt{1-\beta_t}\,x_{t-1},\beta_t\mathbf{1}_d)$. Here $\beta_t$ is the variance schedule.
+\end{answerbox}
+
+\q Why do we choose a small $\beta_t$ and a large number of steps $T\approx1000$?
+\begin{answerbox}
+Small per-step noise keeps each reverse step approximately \textbf{Gaussian}, so a network can model it; using many steps still lets $x_T$ reach (essentially) \textbf{pure noise} $\mathcal{N}(0,I)$.
+\end{answerbox}
+
+\q What does the diffusion network actually predict, and what loss is used?
+\begin{answerbox}
+It predicts the \textbf{noise} $\epsilon$ added at step $t$: $\epsilon_\theta(x_t,t)$. Trained with the simple $\ell_2$ regression $L_{\text{simple}}=\mathbb{E}\big[\|\epsilon-\epsilon_\theta(\sqrt{\bar\alpha_t}\,x_0+\sqrt{1-\bar\alpha_t}\,\epsilon,\,t)\|^2\big]$.
+\end{answerbox}
+
+\q Why can't we train a diffusion model by directly maximising the likelihood, and what is done instead?
+\begin{answerbox}
+The negative log-likelihood $-\sum_{x_0}\log p_\theta(x_0)$ is \textbf{intractable}. Instead we minimise a \textbf{variational upper bound} $L_\theta=-\log p_\theta(x_0)+D_{KL}(q(x_{1:T}|x_0)\,\|\,p_\theta(x_{1:T}|x_0))$ (valid since $\text{KL}\ge0$), which simplifies to $L_{\text{simple}}$.
+\end{answerbox}
+
+\q What is $\bar\alpha_t$ and why is it useful?
+\begin{answerbox}
+$\bar\alpha_t=\prod_{s\le t}(1-\beta_s)$. It lets you jump from $x_0$ to any step $t$ in \textbf{one shot}: $x_t=\sqrt{\bar\alpha_t}\,x_0+\sqrt{1-\bar\alpha_t}\,\epsilon$, so training does not need to simulate the whole chain.
+\end{answerbox}
+
+\q Contrast training and sampling in a diffusion model. Why is sampling slow?
+\begin{answerbox}
+\textbf{Training}: one update samples a \emph{single} random $t$, noises $x_0\to x_t$, and regresses the noise -- cheap, no loop over $t$. \textbf{Sampling}: start from $x_T\sim\mathcal{N}(0,I)$ and run all $T\approx1000$ reverse steps \textbf{sequentially}, each a full network pass -- hence slow. Trap: thinking training also loops over every step.
+\end{answerbox}
+
+\q State the generative learning trilemma and where each family sits.
+\begin{answerbox}
+The three goals are \textbf{high-quality samples}, \textbf{fast sampling}, and \textbf{mode coverage/diversity}; each family gets only \textbf{two}. GANs: quality $+$ speed (sacrifice diversity, mode collapse). Diffusion: quality $+$ diversity (sacrifice speed). VAEs/normalizing flows: speed $+$ diversity (sacrifice quality, blurry).
+\end{answerbox}
+
+\q Which generative models have an explicit (or bounded) likelihood, and which does not?
+\begin{answerbox}
+VAEs and diffusion models optimise a \textbf{likelihood bound} (ELBO / $L_\theta$). GANs have \textbf{no explicit likelihood} -- they are trained implicitly through the adversarial (minimax) game.
 \end{answerbox}
 
 \end{enumerate}

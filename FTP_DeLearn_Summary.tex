@@ -276,10 +276,37 @@
 		\item Reduces spatial size, no learnable parameters.
 	\end{itemize}
 	
+	\subsection{Transposed Convolutions}
+
+	\begin{definitionbox}
+		A \textbf{transposed convolution} (a.k.a.\ \emph{deconvolution}, \emph{fractionally-strided conv}) is a learnable \textbf{upsampling} operation: it maps each input pixel to a larger output patch, increasing spatial resolution. Used in decoders, autoencoders, segmentation and GANs.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item It is the \emph{gradient} (transpose) of a normal convolution -- it reverses the spatial mapping, not the numerical values.
+		\item Stride now acts on the \textbf{output}: $s>1$ inserts zeros \emph{between} input pixels, enlarging the map.
+		\item Padding is applied to the (implicit) enlarged input, so larger padding \emph{shrinks} the output.
+	\end{itemize}
+
+	\begin{formulabox}
+		\[
+		H_{out} = s_h\,(H_{in}-1) + h, \qquad
+		W_{out} = s_w\,(W_{in}-1) + w
+		\]
+		\small $H_{in},W_{in}$: input size; $s_h,s_w$: stride; $h,w$: kernel size.
+		(Add $-2P$ for output padding $P$.)
+	\end{formulabox}
+
+	\begin{importantbox}
+		Normal conv \textbf{downsamples} (many input pixels $\rightarrow$ one output); transposed conv \textbf{upsamples} (one input pixel $\rightarrow$ many outputs). It is \emph{not} a mathematical inverse -- it only restores the \emph{shape}, not the original values.
+	\end{importantbox}
+
 	\subsection{Exam Tips}
-	
+
 	\begin{examtipbox}
 		A conv layer's parameter count is $(K \cdot K \cdot C_{in} + 1)\cdot C_{out}$ -- independent of input spatial size. Be ready to compute feature-map sizes through a stack of layers. Parameter sharing is why CNNs have far fewer weights than an equivalent MLP.
+		\par\smallskip
+		For \textbf{transposed convolutions}, know that they upsample, apply $H_{out}=s(H_{in}-1)+k$, and recognise their use in decoders/GANs. Common trap: calling them a true ``inverse'' of convolution -- they only invert the shape.
 	\end{examtipbox}
 	
 	% ==================================================
@@ -2637,6 +2664,36 @@ model.compile(loss='binary_crossentropy', optimizer='adam',
 		``Is an autoencoder supervised or unsupervised?'' $\to$ \emph{self-supervised}: no external labels, but the data is its own target. ``Why not just learn the identity?'' $\to$ the bottleneck (diabolo) or dropout forces it to compress. Know the encoder/decoder split and that $\mathbf{z}$ is the learned representation.
 	\end{examtipbox}
 
+	\subsection{Autoencoders -- Keras Example (shallow dense)}
+
+	\begin{verbatim}
+encoding_dim = 32                                    # size of code z
+
+input_img = Input(shape=(784,))                      # e.g. 28x28 flattened
+encoded   = Dense(encoding_dim, activation='relu')(input_img)
+decoded   = Dense(784, activation='sigmoid')(encoded)
+
+autoencoder = Model(inputs=input_img, outputs=decoded)   # full AE: x -> x_hat
+encoder     = Model(inputs=input_img, outputs=encoded)   # encoder: x -> z
+
+# build a standalone decoder: z -> x_hat
+encoded_input = Input(shape=(encoding_dim,))
+decoder_layer = autoencoder.layers[-1]               # reuse trained last layer
+decoder = Model(inputs=encoded_input,
+                outputs=decoder_layer(encoded_input))
+	\end{verbatim}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Compression ratio} $784 \to 32 \approx 24.5\times$; the bottleneck is what forces a compact code.
+		\item \textbf{Encoder} \texttt{relu} (free internal code), \textbf{decoder} \texttt{sigmoid} (outputs in $[0,1]$ to match normalised pixels).
+		\item Define the AE \emph{once}, then carve out \texttt{encoder} and \texttt{decoder} as sub-models sharing the \textbf{same trained weights} -- no retraining.
+		\item \texttt{layers[-1]} reuses the trained decoder layer; the standalone decoder lets you decode arbitrary $\mathbf{z}$.
+	\end{itemize}
+
+	\begin{examtipbox}
+		``Why \texttt{sigmoid} on the output but \texttt{relu} on the code?'' $\to$ output must match the input range ($[0,1]$ pixels); the code has no such constraint. ``Why three \texttt{Model}s?'' $\to$ one to \emph{train} (autoencoder), two to \emph{reuse} the learned pieces (encoder for features, decoder for generation) -- all weight-shared.
+	\end{examtipbox}
+
 	\subsection{Autoencoders -- Usages}
 
 	\begin{importantbox}
@@ -2651,65 +2708,513 @@ model.compile(loss='binary_crossentropy', optimizer='adam',
 		\textbf{Usage 2 -- Encoder as feature extractor.} Train a (conv-)AE on your data \emph{including unlabelled} samples; keep the \textbf{encoder} to compute $\mathbf{z}$; use $\mathbf{z}$ as features to train a classifier on the \textbf{labelled} part. (Semi-supervised: leverages unlabelled data.)
 	\end{importantbox}
 
+	\begin{importantbox}
+		\textbf{Usage 3 -- Denoising autoencoder (DAE).} \textbf{Train:} feed a \emph{corrupted} input $\tilde{\mathbf{x}} = \mathbf{x} + \text{noise}$ but reconstruct the \emph{clean} target $\mathbf{x}$. \textbf{Test:} pass a noisy image $\to$ get a cleaner version. Key twist: the target is the \textbf{clean} signal, not the noisy input.
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Why it helps:} forcing clean-from-noisy stops the net learning a trivial identity and pushes $\mathbf{z}$ to capture \textbf{robust structure}, not noise.
+		\item \textbf{As a feature extractor:} learned features show \textbf{robustness to noise}.
+		\item \textbf{Bonus:} injecting artificial noise is a form of \textbf{data augmentation}.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{Usage 4 -- Image in-painting.} Goal: \textbf{restore lost information} by ``painting'' a missing region back in. The AE is trained to reconstruct the \emph{removed} patch from its surroundings.
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Context encoders:} to fill a hole the encoder must learn features that capture not just \textbf{appearance} but also the \textbf{semantics} of visual structures $\to$ \textbf{robust, high-level features}.
+		\item Like the DAE, the corruption (here: masking a region) is what forces a richer representation than a plain reconstruction AE.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{Usage 5 -- Initialise a deep net for supervised learning} (greedy pre-training). Use cheap \textbf{unlabelled} data to find good starting weights, then refine with scarce \textbf{labelled} data.
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Pre-train (unsupervised):} train a \textbf{stacked autoencoder} on unlabelled data.
+		\item \textbf{Fine-tune step 1:} keep the \textbf{encoder}, add a fresh dense (output) layer, train \emph{only that head} on labelled data.
+		\item \textbf{Fine-tune step 2:} if enough labelled data, \textbf{back-propagate through the whole network} to fine-tune end-to-end.
+		\item Shown to \textbf{improve deep nets} -- historically how very deep models were made trainable before good init/normalisation.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{Usage 6 -- Anomaly detection.} Train an AE on \textbf{only ``normal'' samples} (input $=$ output $=$ a non-damaged part). At test time, \textbf{reconstruction error} flags anomalies: defects were never seen, so they reconstruct \emph{poorly}.
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Why it works:} the AE only learns to rebuild ``normal'' $\to$ high error on out-of-distribution (defective) inputs.
+		\item \textbf{Recipe:} collect the \emph{distribution} of reconstruction errors on good parts; a defective part gives an error \textbf{outside} that distribution $\to$ threshold to decide.
+		\item \textbf{Fits unbalanced data:} normal samples are plentiful, defects rare -- you train on the majority class only, no defect labels needed.
+	\end{itemize}
+
 	\begin{examtipbox}
 		``How is an autoencoder related to PCA?'' $\to$ linear AE $\approx$ PCA (learns the principal subspace). Usage 2 is the bridge to \textbf{transfer/self-supervised learning}: pretrain a representation on unlabelled data, then fit a small supervised head.
 	\end{examtipbox}
 
-	\subsection{Self-Supervised Learning}
-	
+	\subsection{Transfer Learning vs Autoencoder}
+
+	\begin{definitionbox}
+		Both produce a \textbf{feature extractor} to reuse on a target task, but they learn it differently: transfer learning reuses a \textbf{discriminative} (supervised, label-driven) representation; an autoencoder learns a \textbf{generative/reconstructive} (unsupervised) representation.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Feature quality (expected):} transfer-learning features are usually \emph{more discriminative} -- they were tuned to separate classes -- \textbf{provided source and target share a domain}. AE features are tuned to \emph{reconstruct} the input, so they encode \textbf{everything} (incl.\ task-irrelevant detail) and are typically \emph{less discriminative} for a specific classifier.
+		\item \textbf{When AE wins:} no suitable pre-trained model exists, or the domain is too different from any source -- then in-domain AE features beat mismatched transferred ones.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tabular}{@{}lll@{}}
+		\toprule
+		 & \textbf{Transfer learning} & \textbf{Autoencoder} \\
+		\midrule
+		Supervision (source) & needs \textbf{labelled} source data & \textbf{unlabelled} (self-supervised) \\
+		Feature type & discriminative, task-driven & reconstructive, generic \\
+		Discriminative power & high (if domains match) & lower (encodes all input info) \\
+		Domain match & \textbf{critical} -- degrades if far & uses \textbf{your own} data, in-domain \\
+		Main risk & negative transfer / domain gap & features not tuned to the task \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{examtipbox}
+		``Quality of features: transfer learning vs autoencoder?'' $\to$ transfer learning $=$ better, \emph{more discriminative} features \textbf{when the source domain matches}; autoencoder $=$ no labels needed and always in-domain, but features are generic/reconstructive and less class-specific. \textbf{Trade-off:} availability of a matching pre-trained model vs.\ availability of (unlabelled) in-domain data.
+	\end{examtipbox}
+
+	\subsection{Self-Supervised Learning (SSL) -- Definition}
+
+	\begin{definitionbox}
+		\textbf{Self-Supervised Learning} learns useful \textbf{feature representations from unlabelled data}: a \textbf{pretext task} pre-trains a model, which is then \textbf{fine-tuned} on downstream tasks. Used in \textbf{NLP, vision and audio}.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Intermediate form} between supervised and unsupervised learning -- imitates how \emph{humans} learn to classify objects.
+		\item Yields \textbf{pre-trained models} with a \emph{generic} data representation, reusable across downstream tasks.
+		\item \textbf{Step 1 -- Pretraining:} profits from \textbf{large unlabelled} datasets (learns the representation via the pretext task).
+		\item \textbf{Step 2 -- Fine-tuning:} done with \textbf{smaller labelled} datasets (adapts to the target task).
+	\end{itemize}
+
 	\begin{importantbox}
 		\textbf{SSL} creates supervision from the data itself via \emph{pretext tasks} (no human labels), then transfers the learned representation. Examples: masked prediction, \textbf{contrastive learning} (SimCLR), pulling augmented views of the same image together and pushing others apart.
 	\end{importantbox}
-	
+
+	\begin{examtipbox}
+		``Is SSL supervised or unsupervised?'' $\to$ \textbf{intermediate}: labels are \emph{generated from the data} (pretext task), not given by humans. Know the \textbf{2 steps}: pretrain on large \emph{unlabelled} data $\to$ fine-tune on small \emph{labelled} data. Contrast with an autoencoder (reconstruction is one possible pretext task).
+	\end{examtipbox}
+
+	\subsection{SSL -- Intuitive Example (BERT)}
+
+	\begin{importantbox}
+		\textbf{BERT} is trained by SSL with \textbf{2 pretext tasks}: (1) \textbf{predict masked words} (Masked LM); (2) \textbf{next-sentence prediction} -- is sentence B the one that follows A?
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Pseudo-labels:} the masked-out words \emph{are} the labels -- derived for free from the \textbf{unlabelled} text, no human annotation.
+		\item \textbf{Downstream task:} fine-tune the pre-trained model on a labelled task, e.g.\ \emph{sentiment analysis}.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tabular}{@{}ll@{}}
+		\toprule
+		\textbf{Stage} & \textbf{Sentence} \\
+		\midrule
+		Original (unlabelled) & A quick brown fox jumps over the lazy dog. \\
+		Randomly masked       & A quick \texttt{[MASK]} fox jumps over the \texttt{[MASK]} dog. \\
+		Prediction            & A quick \textbf{brown} fox jumps over the \emph{nice} dog. \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{itemize}[leftmargin=*]
+		\item The \texttt{[MASK]} positions' true words (\emph{brown}, \emph{lazy}) act as pseudo-labels; the model is trained to recover them (1st guess right, 2nd wrong).
+	\end{itemize}
+
+	\subsection{SSL -- SimCLR}
+
+	\begin{definitionbox}
+		\textbf{SimCLR} (\emph{Simple Framework for Contrastive Learning of Visual Representations}, Google Research) learns image features by \textbf{contrastive learning}: pull two augmentations of the \emph{same} image together (\textbf{positives}) and push \emph{other} images apart (\textbf{negatives}).
+	\end{definitionbox}
+
+	\begin{importantbox}
+		\textbf{Step 1 -- Pre-training (unlabelled):}
+		\begin{enumerate}[leftmargin=*,nosep]
+			\item Augment the source image \textbf{twice} (two views).
+			\item Both views pass the \textbf{encoder} $\to$ a 2000-dim representation each.
+			\item Pass through a \textbf{projection head} (further encodes the representation).
+			\item Optimise the \textbf{NT-Xent} loss: same-image pair $=$ positive, other in-batch samples $=$ negatives.
+		\end{enumerate}
+		\textbf{Step 2 -- Fine-tuning:}
+		\begin{enumerate}[leftmargin=*,nosep,start=5]
+			\item Reuse the \textbf{pre-trained encoder} (drop the projection head) and fine-tune on downstream tasks.
+		\end{enumerate}
+	\end{importantbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Shared weights:} the two branches are the \emph{same} encoder $f(\cdot)$ (and same head $g(\cdot)$) applied to both views -- a \textbf{Siamese} network, \emph{not} two independent encoders.
+		\item \textbf{Negatives come from the batch} $\to$ contrastive methods like SimCLR benefit from \textbf{large batch sizes} (more negatives per step) and \textbf{long training} (many epochs). Cost: needs \textbf{GPUs with lots of memory}.
+		\item \textbf{Projection head} used only during pre-training; \textbf{discarded} for downstream use.
+		\item \emph{SimCLR v2:} larger network + larger projection head.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		font=\footnotesize,
+		>=stealth,
+		circ/.style={draw, circle, inner sep=1.5pt},
+		every edge/.style={draw, ->}]
+		% nodes: left branch (i), right branch (j)
+		\node[circ] (x)  at (2,0)   {$\mathbf{x}$};
+		\node[circ] (xi) at (0,1.4) {$\tilde{\mathbf{x}}_i$};
+		\node[circ] (xj) at (4,1.4) {$\tilde{\mathbf{x}}_j$};
+		\node (hi) at (0,3.0) {$\mathbf{h}_i$};
+		\node (hj) at (4,3.0) {$\mathbf{h}_j$};
+		\node (zi) at (0,4.6) {$\mathbf{z}_i$};
+		\node (zj) at (4,4.6) {$\mathbf{z}_j$};
+		% augmentation (bottom)
+		\draw (x) edge node[below left=-1pt, font=\scriptsize]{$t\sim\mathcal{T}$} (xi);
+		\draw (x) edge node[below right=-1pt, font=\scriptsize]{$t'\sim\mathcal{T}$} (xj);
+		% encoder f
+		\draw (xi) edge node[left, font=\scriptsize]{$f(\cdot)$} (hi);
+		\draw (xj) edge node[right, font=\scriptsize]{$f(\cdot)$} (hj);
+		% projection head g
+		\draw (hi) edge node[left, font=\scriptsize]{$g(\cdot)$} (zi);
+		\draw (hj) edge node[right, font=\scriptsize]{$g(\cdot)$} (zj);
+		% horizontal annotations
+		\draw[<->] (zi) -- node[above, font=\scriptsize]{Maximise agreement} (zj);
+		\draw[<->] (hi) -- node[above, font=\scriptsize]{Representation} (hj);
+	\end{tikzpicture}
+	\\[2pt]
+	{\footnotesize Both branches use the \textbf{same shared-weight} encoder $f(\cdot)$ (\textbf{ResNet-50}) and projection head $g(\cdot)$ -- it is \emph{one} network applied twice (Siamese), not two. The $\mathbf{h}$ representation is reused downstream; $g(\cdot)$ is discarded.}
+	\end{center}
+
+	\begin{formulabox}
+		Per-pair NT-Xent (Normalised Temperature-scaled Cross-Entropy) loss:
+		\[ \ell(i,j) = -\log \frac{\exp(s_{i,j}/\tau)}{\sum_{k=1}^{2N} \mathbb{1}_{[k\neq i]}\,\exp(s_{i,k}/\tau)} \]
+		Total loss over a batch of $N$ images ($2N$ views):
+		\[ \mathcal{L} = \frac{1}{2N}\sum_{k=1}^{N}\big[\ell(2k-1,2k)+\ell(2k,2k-1)\big] \]
+	\end{formulabox}
+
+	\begin{itemize}[leftmargin=*]
+		\item $s_{i,j}$: similarity (cosine) between projected views $\mathbf{z}_i,\mathbf{z}_j$.
+		\item $\tau$: temperature (scales the logits; smaller $\to$ sharper).
+		\item $N$: batch size; $2N$: total augmented views; $\mathbb{1}_{[k\neq i]}$: excludes the sample itself from the denominator.
+		\item Numerator $=$ the \textbf{positive} pair; denominator sums over \emph{all other} ($2N-1$) views $=$ the \textbf{negatives}. $\mathcal{L}$ averages the loss \textbf{both directions} of each pair.
+	\end{itemize}
+
+	\begin{examtipbox}
+		``BERT vs SimCLR?'' $\to$ both SSL, but BERT $=$ \textbf{predictive/generative} pretext (masked words), SimCLR $=$ \textbf{contrastive} (positives vs negatives, NT-Xent). ``Why a big batch?'' $\to$ negatives are the other batch samples. ``Why drop the projection head?'' $\to$ the \emph{encoder} representation transfers better than the projected one.
+	\end{examtipbox}
+
+	\subsection{Wrap-up}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Keras functional API:} build \emph{non-sequential} architectures -- multiple inputs/outputs, shared/branched feature extraction.
+		\item \textbf{Transfer learning:} export knowledge to a new environment by \textbf{re-using feature-extraction layers} of a pre-trained net $\to$ enables deep learning on \textbf{small datasets}.
+		\item \textbf{Autoencoders:} nets trained to \textbf{reproduce their input}, discovering a useful internal representation. \textbf{Diabolo} topology; forms: shallow dense, stacked dense, CNN. \textbf{6 usages:} compression, feature extraction, de-noising, image in-painting, deep-net pre-training, anomaly detection.
+		\item \textbf{Self-supervised learning:} learn from \textbf{large unlabelled} data via a \textbf{pretext task}; like transfer learning, fine-tune on a \textbf{downstream task}.
+		\item \textbf{Representation / feature learning:} techniques to \emph{discover} the representations needed for feature extraction from raw data -- \textbf{replaces manual feature engineering}.
+	\end{itemize}
+
+	\begin{importantbox}
+		Common thread: all four learn a \textbf{reusable representation} so a downstream task needs less labelled data. They differ in the \emph{source} of the learning signal: \textbf{labels} (transfer), \textbf{reconstruction} (autoencoder), or a \textbf{pretext task} (SSL).
+	\end{importantbox}
+
 	\subsection{Exam Tips}
-	
+
 	\begin{examtipbox}
 		Transfer learning shines with little target data. Autoencoders are unsupervised reconstruction; SSL uses pretext tasks to learn general features. Contrastive losses need negatives (or tricks like BYOL to avoid them).
 	\end{examtipbox}
-	
+
 	% ==================================================
 	\section{Seq2Seq -- Attention -- Transformers}
 	% ==================================================
 	
 	\subsection{Seq2Seq}
-	
+
 	\begin{definitionbox}
-		An \textbf{encoder--decoder} maps an input sequence to an output sequence. The encoder summarizes the input; the decoder generates the output token by token.
+		A \textbf{sequence-to-sequence (Seq2Seq)} model maps an input sequence to an output sequence of \emph{possibly different length}, where the \textbf{entire input must be read before output prediction can start}.
 	\end{definitionbox}
-	
-	The fixed-size context vector is a bottleneck for long sequences -- solved by \textbf{attention}.
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Applications}: machine translation, question-answering bots, grapheme-to-phoneme mapping.
+		\item Initial architectures are \textbf{RNN-based}: two RNNs -- an \textbf{encoder} and a \textbf{decoder}.
+		\item \textbf{Encoder}: reads the whole input and compresses it into a fixed-size \textbf{context vector} $h_t$ (its final hidden state) -- a numerical summary of the input's \emph{meaning}. Called a \textbf{sentence/thought embedding} when inputs are words.
+		\item \textbf{Decoder}: initialised with the context vector, generates the output \textbf{token by token} (autoregressively, feeding each output back as the next input). Original Seq2Seq used \emph{only the encoder's last state} as the decoder's initial state.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tikzpicture}[node distance=8mm, font=\small,
+		enc/.style={draw, fill=blue!10, minimum size=7mm},
+		dec/.style={draw, fill=green!10, minimum size=7mm}]
+		\node[enc] (e1) {$h_1$};
+		\node[enc, right=of e1] (e2) {$h_2$};
+		\node[enc, right=of e2] (e3) {$h_3$};
+		\node[dec, right=14mm of e3] (d1) {$s_1$};
+		\node[dec, right=of d1] (d2) {$s_2$};
+		% encoder inputs
+		\node[below=5mm of e1] (x1) {$x_1$};
+		\node[below=5mm of e2] (x2) {$x_2$};
+		\node[below=5mm of e3] (x3) {$x_3$};
+		% decoder outputs
+		\node[above=5mm of d1] (y1) {$y_1$};
+		\node[above=5mm of d2] (y2) {$y_2$};
+		\draw[->] (x1)--(e1); \draw[->] (x2)--(e2); \draw[->] (x3)--(e3);
+		\draw[->] (e1)--(e2); \draw[->] (e2)--(e3);
+		\draw[->] (d1)--(d2);
+		\draw[->] (d1)--(y1); \draw[->] (d2)--(y2);
+		\draw[->, thick] (e3)-- node[above, font=\scriptsize]{context} (d1);
+	\end{tikzpicture}
+	\end{center}
+
+	\textbf{Layered structure} (each token, both sides): one-hot vector $\to$ \textbf{embedding layer} $\to$ \textbf{recurrent layer}; the decoder adds an \textbf{output layer} (softmax over vocabulary).
+
+	\begin{formulabox}
+		\textbf{Notation} ($s$ = source/encoder, $t$ = target/decoder):
+		\[
+		\tilde{x}_i,\ h_i^{(s)} \quad\text{(enc)}\qquad
+		z = h_0^{(t)} = h_N^{(s)} \quad\text{(context)}\qquad
+		\tilde{y}_j,\ h_j^{(t)},\ o_j \quad\text{(dec)}
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $x_i$: one-hot input, $\tilde{x}_i$: its embedding; $o_j$: decoder output (softmax) at step $j$.
+		\item Decoder is fed the \emph{previous} token $y_{j-1}$ to predict $y_j$ (autoregressive / teacher forcing).
+	\end{itemize}
+
+	\begin{importantbox}
+		Special tokens \textbf{\texttt{<BOS>}} (beginning) and \textbf{\texttt{<EOS>}} (end of sentence): \texttt{<BOS>} kicks off decoding; generation stops when the decoder emits \texttt{<EOS>}.
+	\end{importantbox}
+
+	\begin{importantbox}
+		The single fixed-size \textbf{context vector} is a bottleneck: all input information must be squeezed into it, which degrades for long sequences -- solved by \textbf{attention}.
+	\end{importantbox}
 	
 	\subsection{Attention}
+
+	\begin{definitionbox}
+		\textbf{Attention} is an \textbf{interface between encoder and decoder} that gives the decoder information from \emph{all (or parts of)} the encoder hidden states -- not just the final one $h_t$.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item Without attention, the decoder receives \textbf{only} the last hidden state $h_t$ (the bottleneck).
+		\item \textbf{Intuition = alignment}: which input segments match which output segments, i.e.\ \emph{where the decoder should focus} to produce the current output token.
+		\item \textbf{Global attention}: uses \emph{all} encoder hidden states.
+		\item \textbf{Local attention}: uses only a \emph{subset} of the encoder hidden states.
+	\end{itemize}
+
+	\begin{center}
+		\includegraphics[width=\linewidth]{images_summary/seq2seq_attention_layer.png}
+	\end{center}
+
+	\textbf{Attention steps} (one context vector per decoder step):
+	\begin{enumerate}[leftmargin=*, label=\textbf{\arabic*.}, start=0]
+		\item \textbf{Prepare hidden states}: take all encoder hidden states (green) and the current decoder hidden state (red).
+		\item \textbf{Score each encoder state}: a \textbf{score function} (a.k.a.\ \emph{alignment score function / alignment model}) gives a scalar per encoder state -- e.g.\ dot product of decoder and encoder hidden states.
+		\item \textbf{Softmax the scores}: pass scores through softmax so they sum to 1 -- the \textbf{attention distribution}.
+		\item \textbf{Multiply}: scale each encoder hidden state by its softmaxed score $\Rightarrow$ \textbf{alignment vectors}. This is where alignment happens (\emph{which token matters at this decoding step?}).
+		\item \textbf{Sum}: add the alignment vectors $\Rightarrow$ the \textbf{context vector} (aggregated information).
+		\item \textbf{Feed to decoder}: combine context vector with the decoder state -- e.g.\ Bahdanau et al.\ (2015) \emph{concatenate} hidden state and context vector. The new decoder state then drives the \emph{next} context vector.
+	\end{enumerate}
+
+	\begin{importantbox}
+		\textbf{Wrap-up.} Plain \textbf{Seq2Seq}: encoder--decoder with 2 RNNs; \emph{only} the last encoder state $h_t$ is passed to the decoder. \textbf{Seq2Seq + attention}: \emph{all} encoder states $(h_0,\dots,h_t)$ are available; an attention layer exploits them and the inputs $(x_0,\dots,x_t)$ to refine generation of each next token. Attention = an interface between encoder and decoder giving the decoder information from all (or parts of) the encoder hidden states.
+	\end{importantbox}
+
+	\subsection{Transformers}
+
+	\begin{definitionbox}
+		A \textbf{Transformer} is a deep-learning architecture for sequential data that processes it \emph{without ordered processing}, relying entirely on the \textbf{attention mechanism}.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Like RNNs}: handle sequential data -- natural language, time series, etc.\ (and images, since pixels are also a sequence -- but first applications were NLP).
+		\item \textbf{Unlike RNNs}: no need to process data \emph{in order} (e.g.\ not start-of-sentence before end).
+		\item Context/meaning of a token is captured by \textbf{attention}, which weights the influence of different parts of the input.
+		\item Order-independence $\Rightarrow$ \textbf{much more parallelisation} than RNNs.
+	\end{itemize}
+
+	\begin{importantbox}
+		The \textbf{Transformer} replaces recurrence with \textbf{self-attention}, so all positions are processed in parallel. Key parts: multi-head attention, positional encodings, feed-forward layers, residual + LayerNorm.
+	\end{importantbox}
+
+	\begin{center}
+	\begin{tabular}{@{}lll@{}}
+		\toprule
+		& \textbf{RNN} & \textbf{Transformer} \\
+		\midrule
+		Computation & serial & parallel \\
+		Mixing layer & recurrent (non-linear) & attention (linear) \\
+		Token interaction & via hidden state chain & weighted token combinations \\
+		Per-token transform & -- & feed-forward (non-linear) \\
+		Flow & input $\to$ hidden states & input $\to$ weighted combos $\to$ output \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{"Parallelisation is all you need".} Better parallelisation $\Rightarrow$ shorter training times $\Rightarrow$ larger training sets $\Rightarrow$ better language models. Transformers are now the \textbf{de facto standard for NLP}, surpassing recurrent LSTM-based architectures.
+	\end{importantbox}
+
+	\textbf{High-level architecture}: an \textbf{encoding} part + a \textbf{decoding} part + a connection between them.
+	\begin{itemize}[leftmargin=*]
+		\item Similar in shape to an \textbf{auto-encoder} or \textbf{Seq2Seq} -- but \emph{internally} different from RNN-based Seq2Seq.
+		\item In \textbf{pre-trained models}, the encoder or decoder sub-parts can be used \emph{alone}.
+		\item Encoding part = a \textbf{stack of $n$ encoder modules}; decoding part = a \textbf{stack of $n$ decoder modules}.
+		\item All encoders share the \emph{same structure}; all decoders share the \emph{same structure}.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{No weight sharing} between modules: same structure but \emph{different weights}. The \emph{top} encoder's output is fed to \emph{every} decoder module.
+	\end{importantbox}
+
+	\begin{center}
+	\begin{tikzpicture}[node distance=10mm, font=\small, >=stealth,
+		blk/.style={draw, rounded corners, minimum width=22mm, minimum height=12mm}]
+		\node[blk, fill=green!12] (enc) {ENCODERS};
+		\node[blk, fill=red!10, right=14mm of enc] (dec) {DECODERS};
+		\node[below=6mm of enc] (in) {INPUT: \emph{Je suis étudiant}};
+		\node[above=6mm of dec] (out) {OUTPUT: \emph{I am a student}};
+		\draw[->, thick] (enc)--(dec);
+		\draw[->] (in)--(enc);
+		\draw[->] (dec)--(out);
+	\end{tikzpicture}
+	\end{center}
 	
+	\subsubsection*{Typical architecture}
+
+	\begin{minipage}[t]{0.58\linewidth}
+		\begin{itemize}[leftmargin=*]
+			\item \textbf{Sub-word tokens}: use frequent sub-words as tokens instead of whole words.
+			\item \textbf{Positional encoding}: add a vector to the embedding that encodes the token's position (attention is otherwise permutation-invariant).
+			\item \textbf{Multi-head attention}: compute several $\mathrm{Attention}(Q,K,V)$ functions in parallel and \emph{concatenate} the results.
+			\item \textbf{Self-attention}: each token attends to all tokens in the same sequence.
+			\item \textbf{Cross-attention} (decoder): $Q$ from output tokens, $K,V$ from input tokens.
+			\item \textbf{Causal / masked self-attention} (decoder): attend only to \emph{previous} output tokens.
+			\item \textbf{Residual connections} around self-attention and the feed-forward layer.
+			\item \textbf{Normalization} layers (e.g.\ \texttt{Add \& Norm}).
+			\item \textbf{Encoder-only} models (e.g.\ BERT) and \textbf{decoder-only} models (e.g.\ GPT).
+		\end{itemize}
+	\end{minipage}\hfill
+	\begin{minipage}[t]{0.38\linewidth}
+		\centering
+		\includegraphics[width=0.85\linewidth]{images_summary/transformer_architecture.png}
+	\end{minipage}
+
 	\begin{formulabox}
 		\textbf{Scaled dot-product attention:}
 		\[
 		\mathrm{Attention}(Q,K,V) = \mathrm{softmax}\!\left(\frac{QK^\top}{\sqrt{d_k}}\right) V
 		\]
 	\end{formulabox}
-	
 	\begin{itemize}[leftmargin=*]
 		\item \textbf{Q, K, V}: queries, keys, values.
-		\item Attention weights = similarity between a query and all keys.
-		\item Lets the decoder look at all encoder states, not just the last.
+		\item Queries and keys determine which other tokens are relevant; their weights \textbf{sum to 1} (softmax).
+		\item New token embedding = \textbf{weighted sum over all token values} ($V$) by the attention weights.
+		\item $\sqrt{d_k}$ scaling keeps softmax gradients stable.
+		\item \textbf{Complexity $O(n^2)$} in the number of tokens $n$ (every token attends to every token).
 	\end{itemize}
-	
-	\subsection{Transformers}
-	
-	\begin{importantbox}
-		The \textbf{Transformer} replaces recurrence with \textbf{self-attention}, so all positions are processed in parallel. Key parts: multi-head attention, positional encodings, feed-forward layers, residual + LayerNorm.
-	\end{importantbox}
-	
+
+	\subsubsection*{Encoder vs decoder module (inner structure)}
+
+	The encoder and decoder modules have a \textbf{different inner structure} (feed-forward = a "simple" dense layer):
+	\begin{center}
+	\begin{tabular}{@{}ll@{}}
+		\toprule
+		\textbf{Encoder module} & \textbf{Decoder module} \\
+		\midrule
+		Self-Attention & Self-Attention (\emph{masked}) \\
+		-- & Encoder--Decoder Attention \\
+		Feed Forward & Feed Forward \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{Self-attention}: each token attends to all tokens in the same sequence.
-		\item \textbf{Multi-head}: several attention heads capture different relations.
-		\item \textbf{Positional encoding}: injects order (attention is permutation-invariant).
+		\item \textbf{"Self"}-attention: computed looking \emph{only} at the input sequence -- no data from the decoder.
+		\item \textbf{Encoder--Decoder attention}: similar to the attention used in Seq2Seq RNN architectures.
 	\end{itemize}
-	
+
+	\subsubsection*{Self-attention layer}
+
+	\begin{definitionbox}
+		A \textbf{self-attention layer} implements an attention mechanism by looking at \textbf{adjacent inputs} to produce an \emph{enhanced} representation of the current input.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Like} Seq2Seq attention -- same \emph{objective}.
+		\item \textbf{Unlike} Seq2Seq attention -- it looks only at adjacent inputs (the same sequence), not inputs from other parts of the model. Hence \textbf{"self"}.
+		\item Implementations may vary.
+	\end{itemize}
+
+	\subsubsection*{Word paths through the encoder}
+
+	\begin{itemize}[leftmargin=*]
+		\item The first encoder receives the \textbf{word embeddings}; each word then flows through its \emph{own path}.
+		\item \textbf{Self-attention} produces an "enhanced" $z_i$ of word $x_i$ at position $i$, accounting for context.
+	\end{itemize}
+	\begin{formulabox}
+		\[
+		z_i = f_{sa}(x_1,\dots,x_i,\dots,x_S) \qquad r_i = f_{ff}(z_i)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item Self-attention $f_{sa}$ has \textbf{dependencies} across paths -- $z_i$ depends on \emph{all} $S$ words.
+		\item Feed-forward $f_{ff}$ has \textbf{no dependencies} -- $r_i$ depends only on $z_i$ (so paths run in parallel here).
+	\end{itemize}
+
+	\subsubsection*{Key--Value--Query computation}
+
+	\textbf{Underlying idea}: project each input vector into \emph{three} spaces for information retrieval.
+	\begin{center}
+	\begin{tabular}{@{}ll@{}}
+		\toprule
+		\textbf{Query} $q$ & which features around the current token to look for (\emph{"any adjective around?"}) \\
+		\textbf{Key} $k$ & tokens projected to align with queries -- like dictionary keys (\emph{"I'm an adjective"}) \\
+		\textbf{Value} $v$ & the feature values to retrieve (\emph{"bake in these concepts"}) \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+	\begin{formulabox}
+		\[
+		q_i = x_i W^Q \qquad k_i = x_i W^K \qquad v_i = x_i W^V
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $W^Q, W^K, W^V$: matrices \textbf{learned during training} -- like three \textbf{Dense layers without bias}.
+		\item Weights are \textbf{shared across all inputs} (a bit like a Conv filter with stride = input vector dim).
+		\item In practice \textbf{more than one projection} (multiple queries) -- analogous to multiple filters in CNNs.
+	\end{itemize}
+
+	\begin{center}
+		\includegraphics[width=\linewidth]{images_summary/self_attention_example.png}
+	\end{center}
+	Worked example: each query scores against every key $\to$ multiply each value by its score $\to$ sum (\emph{addition}) gives that position's output.
+
+	\textbf{Computation steps:}
+	\begin{enumerate}[leftmargin=*]
+		\item Map all inputs to key--value--query vectors (typically 3 Dense layers).
+		\item For a given input:
+		\begin{enumerate}[leftmargin=*, label=\arabic*.]
+			\item Compute attention scores between this input and all adjacent inputs; \textbf{normalize with softmax}.
+			\item Multiply the value vectors by the scores -- \emph{amplifies} relevant inputs, \emph{de-amplifies} irrelevant ones.
+			\item Add the results to get this input's output.
+		\end{enumerate}
+	\end{enumerate}
+
 	\subsection{Exam Tips}
 	
 	\begin{examtipbox}
-		The $\sqrt{d_k}$ scaling keeps softmax gradients stable. Transformers parallelize over the sequence (unlike RNNs) -- a major reason they scale. Know the three attention types: encoder self-attn, masked decoder self-attn, encoder--decoder cross-attn.
+		\textbf{Likely questions \& pitfalls:}
+		\begin{itemize}[leftmargin=*]
+			\item \emph{"Why $\sqrt{d_k}$?"} -- large dot products push softmax into saturated regions $\Rightarrow$ vanishing gradients; scaling keeps them stable. (\textbf{apply}, not derive.)
+			\item \emph{"Why are Transformers faster to train than RNNs?"} -- no ordered processing $\Rightarrow$ the sequence is processed in parallel (RNNs are inherently serial).
+			\item Know the \textbf{three attention types}: encoder self-attention, \emph{masked} decoder self-attention, encoder--decoder \emph{cross}-attention.
+			\item \emph{"Why positional encoding?"} -- self-attention is \textbf{permutation-invariant}; without it word order is lost.
+			\item \textbf{Complexity}: self-attention is $O(n^2)$ in sequence length $n$ -- the motivation for efficient/long-context variants.
+			\item Common mistake: thinking $Q,K,V$ are different inputs -- they are \emph{three learned projections of the same input} (in self-attention).
+			\item Within a module only \textbf{self-attention couples tokens}; the feed-forward layer acts \emph{per-token} (independent paths).
+			\item \emph{"Compare BERT vs GPT"} -- encoder-only (bidirectional) vs decoder-only (causal/autoregressive).
+			\item Don't confuse \textbf{LayerNorm} (per-token, used in Transformers) with BatchNorm.
+		\end{itemize}
 	\end{examtipbox}
 	
 	% ==================================================
@@ -2717,48 +3222,519 @@ model.compile(loss='binary_crossentropy', optimizer='adam',
 	% ==================================================
 	
 	\subsection{Variational Autoencoder (VAE)}
-	
+
+	\textbf{Core idea.}
+
 	\begin{definitionbox}
-		A \textbf{VAE} learns a probabilistic latent space: the encoder outputs a distribution $q(z|x)$, the decoder reconstructs $x$ from sampled $z$. Trained by maximizing the \textbf{ELBO}.
+		\textbf{Goal:} generate new samples that follow the unknown \textbf{data distribution} $x\sim q$. Do it via a \textbf{latent variable model}: sample a latent $z$ from an easy prior, then decode it to a data point.
+		\[
+		z \sim p_{\text{prior}}(z), \qquad x \sim p_\theta(x|z)
+		\]
+		$p_{\text{prior}}(z)$: fixed easy prior (usually $\mathcal{N}(0,I)$). \quad $p_\theta(x|z)$: \textbf{decoder}, maps latent $\to$ data.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\textbf{Ideal objective = maximum likelihood (MLE).} Pick $\theta$ so the model puts probability mass where real data lives:
+		\[
+		\hat\theta = \arg\max_\theta\;
+		\underbrace{\mathbb{E}_{x\sim q}\big[\log p_\theta(x)\big]}_{\text{avg.\ log-lik.\ of real data}},
+		\qquad
+		p_\theta(x) = \mathbb{E}_{z\sim p_{\text{prior}}}\big[p_\theta(x|z)\big]
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $\mathbb{E}_{x\sim q}[\cdot]$: sample a \emph{real} point from data dist.\ $q$, evaluate $\log p_\theta$ there. With a dataset $\{x^{(i)}\}$ this is just the Monte-Carlo / empirical MLE average $\tfrac{1}{N}\sum_i \log p_\theta(x^{(i)})$.
+		\item \textbf{Two distributions over $x$ -- keep them apart:} \;$q(x)$ = true data dist.\ (can \emph{sample}, no formula); \;$p_\theta(x)$ = model dist.\ (can \emph{evaluate}, controlled by $\theta$).
+	\end{itemize}
+
+	\begin{importantbox}
+		The marginal $p_\theta(x)=\int p_\theta(x|z)\,p_{\text{prior}}(z)\,dz$ is \textbf{intractable} (integral over all $z$). \\
+		\textbf{Fix:} learn an \textbf{encoder} $q_\phi(z|x)$ that maps data into the latent space so it matches the prior, then chain it with the decoder $p_\theta(x|z)$ -- and optimize the tractable \textbf{ELBO} instead of $\log p_\theta(x)$ directly.
+	\end{importantbox}
+
+	\begin{center}
+	\begin{tikzpicture}[font=\scriptsize, >=Stealth,
+		blk/.style={draw, rounded corners=1pt, inner sep=2.5pt, font=\scriptsize},
+		enc/.style={->, thick, orange!85!black},
+		dec/.style={->, thick, blue!70},
+		gen/.style={->, dotted, thick, gray}]
+		% --- z-space (latent) circle: distribution p_theta(z) ---
+		\node[circle, draw, fill=gray!25, minimum size=13mm] (zs) at (0,3.0) {};
+		\fill[gray!50] ($(zs)+(-1.3mm,1.4mm)$) ellipse (1.7mm and 1.1mm);
+		\node[circle, fill=orange, draw=orange!50!black, inner sep=1.1pt] (zi) at ($(zs)+(1.4mm,-1.2mm)$) {};
+		\node[font=\tiny] at ($(zi)+(2.4mm,-0.4mm)$) {$z$};
+		\node[font=\tiny\bfseries, right=1mm of zs.east] {z-space};
+		% --- prior ---
+		\node[blk] (prior) at (0,4.15) {Prior $p_\theta(z)$};
+		% --- encoder / decoder ---
+		\node[blk] (enc) at (-2.05,1.75) {Encoder $q_\phi(z|x)$};
+		\node[blk] (dec) at (2.05,1.75) {Decoder $p_\theta(x|z)$};
+		% --- x-space: data distribution q(x) as an irregular manifold ---
+		\draw[fill=blue!10, draw=blue!45, thick] plot[smooth cycle, tension=0.85] coordinates
+			{(-0.85,1.45) (-0.45,1.62) (-0.05,1.5) (0.42,1.68) (0.86,1.46)
+			 (0.55,1.2) (0.15,1.34) (-0.32,1.18) (-0.72,1.3)};
+		\node[circle, fill=orange, draw=orange!50!black, inner sep=1.1pt] (xi) at (0.42,1.68) {};
+		\node[font=\tiny] at ($(xi)+(1.6mm,1.5mm)$) {$x$};
+		\node[font=\tiny\bfseries] at (1.6,1.25) {x-space};
+		% --- dataset ---
+		\node[blk] (data) at (0,0.15) {Dataset $\mathbf{D}$};
+		% --- generative side (dotted, gray) ---
+		\draw[gen] (prior) -- (zs);
+		\draw[gen] (data) -- (0,1.05);
+		% --- encode a single point: x -> encoder -> z ---
+		\draw[enc] (xi) to[bend left=18] (enc.south);
+		\draw[enc] (enc.north) to[bend left=18] (zi);
+		\node[font=\tiny, orange!85!black] at (-1.55,2.85) {encode};
+		% --- decode it back: z -> decoder -> x ---
+		\draw[dec] (zi) to[bend left=18] (dec.north);
+		\draw[dec] (dec.south) to[bend left=18] (xi);
+		\node[font=\tiny, blue!70] at (1.55,2.85) {decode};
+	\end{tikzpicture}
+	\end{center}
+	{\footnotesize Blue blob = data distribution $q(x)$ in \textbf{x-space} (samples = Dataset $\mathbf{D}$). A point $x$ is \textcolor{orange!85!black}{\textbf{encoded}} to a latent $z$ in \textbf{z-space} (shaped to match the prior $p_\theta(z)$), then \textcolor{blue!70}{\textbf{decoded}} back to reconstruct $x$. \emph{(Kingma \& Welling, 2019)}}
+
+	\begin{definitionbox}
+		A \textbf{VAE} learns a probabilistic latent space: the encoder $q_\phi(z|x)$ outputs a distribution, the decoder $p_\theta(x|z)$ reconstructs $x$ from sampled $z$. Trained by maximizing the \textbf{ELBO}.
 	\end{definitionbox}
 	
 	\begin{formulabox}
+		\textbf{Closed form} (Gaussian $q_\phi$, $\mathcal{N}(0,I)$ prior):
 		\[
-		\mathcal{L}_{\text{VAE}} =
-		\underbrace{\mathbb{E}_{q(z|x)}[\log p(x|z)]}_{\text{reconstruction}}
-		- \underbrace{D_{KL}\big(q(z|x)\,\|\,p(z)\big)}_{\text{regularizer}}
+		\mathcal{L}_{\text{VAE}}(x,\hat x) =
+		\underbrace{\|\hat x - x\|^2}_{\text{reconstruction } L_{rec}}
+		+ \underbrace{\tfrac{1}{2}\sum_i\big(\exp(\mathrm{logvar}_i(x)) + \mu_i(x)^2 - 1 - \mathrm{logvar}_i(x)\big)}_{D_{KL}(q_\phi(z|x)\,\|\,p_{\text{prior}}(z))}
 		\]
 	\end{formulabox}
-	
-	The \textbf{reparameterization trick} ($z = \mu + \sigma \odot \epsilon$, $\epsilon\sim\mathcal{N}(0,I)$) makes sampling differentiable.
-	
-	\subsection{Generative Adversarial Network (GAN)}
-	
-	\begin{formulabox}
-		\textbf{Minimax objective:}
-		\[
-		\min_G \max_D \;
-		\mathbb{E}_{x}[\log D(x)] + \mathbb{E}_{z}[\log(1 - D(G(z)))]
-		\]
-	\end{formulabox}
-	
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{Generator} $G$: turns noise into fake samples.
-		\item \textbf{Discriminator} $D$: distinguishes real from fake.
-		\item Issues: training instability, \textbf{mode collapse}.
+		\item $\|\hat x - x\|^2$: \textbf{reconstruction loss} (squared error, as in a plain AE); $\hat x$ depends on encoder \emph{and} decoder params $\phi,\theta$.
+		\item $\mu_i(x),\mathrm{logvar}_i(x)$: encoder outputs (depend on $\phi$). Using $\mathrm{logvar}$ and $\sigma_i = \exp(\mathrm{logvar}_i/2)$ guarantees a positive std.\ dev.
+		\item The sum is the closed-form KL between $\mathcal{N}(\mu,\sigma^2)$ and $\mathcal{N}(0,I)$ (with $\sigma_i^2=\exp(\mathrm{logvar}_i)$).
 	\end{itemize}
 	
-	\subsection{Diffusion Models}
+	The \textbf{reparameterization trick} ($z = \mu + \sigma \odot \epsilon$, $\epsilon\sim\mathcal{N}(0,I)$) makes sampling differentiable.
+
+	\begin{center}
+	\begin{tikzpicture}[>=Stealth, font=\small,
+		bar/.style={draw, minimum width=7mm, minimum height=24mm, rounded corners=1pt},
+		ms/.style={draw, fill=green!25, minimum width=9mm, minimum height=6mm, font=\bfseries},
+		lat/.style={draw, fill=red!55, text=white, minimum width=7mm, minimum height=10mm, font=\bfseries}]
+
+		% input / output bars
+		\node[bar, fill=green!45] (x) {$\mathbf{x}$};
+		\node[above=1mm of x, font=\scriptsize\bfseries, fill=gray!20, inner sep=2pt] {Input};
+
+		% encoder mean/std
+		\node[ms, right=14mm of x, yshift=7mm]  (mu)    {$\boldsymbol{\mu}$};
+		\node[ms, right=14mm of x, yshift=-7mm] (sigma) {$\boldsymbol{\sigma}$};
+		\node[left=0.5mm of mu, font=\scriptsize] {Mean};
+		\node[left=0.5mm of sigma, font=\scriptsize] {Std.\ dev};
+		\node[above=5mm of mu, font=\scriptsize\bfseries, green!50!black, align=center]
+			(enc) {Probabilistic Encoder\\[-1pt] $q_\phi(\mathbf{z}|\mathbf{x})$};
+
+		% latent
+		\node[lat, right=20mm of mu, yshift=-7mm] (z) {$\mathbf{z}$};
+		\node[above=2mm of z, font=\scriptsize\bfseries, red!70!black, align=center] {Sampled\\[-1pt] latent vector};
+
+		% decoder (trapezium opening to the right)
+		\node[draw, fill=blue!55, text=white, trapezium, trapezium left angle=110, trapezium right angle=70,
+			shape border rotate=270, minimum width=20mm, minimum height=18mm, right=16mm of z,
+			align=center, font=\scriptsize\bfseries] (dec) {Probabilistic\\ Decoder\\ $p_\theta(\mathbf{x}|\mathbf{z})$};
+
+		% reconstructed bar
+		\node[bar, fill=blue!35, right=14mm of dec] (xp) {$\mathbf{x'}$};
+		\node[above=1mm of xp, font=\scriptsize\bfseries, fill=gray!20, inner sep=2pt] {Reconstructed input};
+
+		% arrows
+		\draw[->] (x.east) -- (mu.west);
+		\draw[->] (x.east) -- (sigma.west);
+		\draw[->] (mu.east)    -- ([yshift=4mm]z.west);
+		\draw[->] (sigma.east) -- ([yshift=-4mm]z.west);
+		\draw[->] (z) -- (dec);
+		\draw[->] (dec) -- (xp);
+
+		% top identical note
+		\node[above=11mm of dec, font=\scriptsize, align=center]
+			{Ideally they are identical.\\[1pt] $\mathbf{x}\approx\mathbf{x'}$};
+
+		% bottom captions
+		\node[below=12mm of sigma, font=\scriptsize] {$\mathbf{z}=\boldsymbol{\mu}+\boldsymbol{\sigma}\odot\boldsymbol{\epsilon},\;\; \boldsymbol{\epsilon}\sim\mathcal{N}(0,I)$};
+		\node[below=2mm of z, font=\scriptsize, align=center, text width=42mm]
+			{A compressed low-dimensional representation of the input.};
+	\end{tikzpicture}
+	\end{center}
+
+	\subsection{Kullback--Leibler (KL) Divergence}
+
+	\begin{definitionbox}
+		The \textbf{KL divergence} measures the discrepancy between two probability densities $p(\cdot),q(\cdot)$ on $X$ -- ``how far'' $q$ is from $p$. It is the regularizer in the VAE ELBO.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\[
+		D_{KL}(p\,\|\,q) = \int_X p(x)\,\log\frac{p(x)}{q(x)}\,dx
+		= \mathbb{E}_{x\sim p}\!\left[\log\frac{p(x)}{q(x)}\right]
+		\]
+		\[
+		D_{KL}(p\|q) =
+		\underbrace{-\!\int_X p(x)\log q(x)\,dx}_{\text{cross-entropy } H(p,q)}
+		-\underbrace{\Big(\!-\!\int_X p(x)\log p(x)\,dx\Big)}_{\text{entropy } H(p)}
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $p,q$: densities on $X$. \quad The expectation is taken under $p$ (the \textbf{first} argument).
+	\end{itemize}
+
+	\textbf{Properties:}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Not symmetric:} $D_{KL}(p\|q)\neq D_{KL}(q\|p)$ $\Rightarrow$ \emph{not} a distance metric (no triangle inequality).
+		\item \textbf{Non-negative:} $D_{KL}(p\|q)\ge 0$, with equality iff $p=q$. Easy to prove since $-\log$ is \textbf{convex} (apply Jensen's inequality).
+	\end{itemize}
 	
 	\begin{importantbox}
-		\textbf{Diffusion} gradually adds Gaussian noise to data (\emph{forward} process), then trains a network to \emph{reverse} it -- denoising step by step to generate samples. State of the art for image generation (e.g.\ Stable Diffusion).
+		$H(p)$ does not depend on $q$, so \textbf{minimizing $D_{KL}(p\|q)$ over $q$ $=$ minimizing the cross-entropy $H(p,q)$} -- this is why MLE is equivalent to minimizing cross-entropy. In the VAE, the term $D_{KL}\big(q_\phi(z|x)\,\|\,p(z)\big)$ pulls the encoder toward the prior.
 	\end{importantbox}
-	
+
+	\begin{examtipbox}
+		\begin{itemize}[leftmargin=*]
+			\item ``Why is KL \emph{not} a distance?'' $\to$ not symmetric, no triangle inequality.
+			\item \textbf{Forward vs reverse KL:} $D_{KL}(p\|q)$ is mass-covering (mean-seeking); $D_{KL}(q\|p)$ is mode-seeking. VAEs minimize the \emph{reverse} form $D_{KL}(q_\phi\|p)$.
+			\item Remember: $\text{KL} = \text{cross-entropy} - \text{entropy}$.
+		\end{itemize}
+	\end{examtipbox}
+
+	\subsection{Generative Adversarial Network (GAN)}
+
+	\begin{definitionbox}
+		A \textbf{GAN} trains two networks in an \textbf{adversarial game}: a \textbf{generator} $G_\phi$ that maps random noise $z$ to fake samples, and a \textbf{discriminator} $D_\theta$ that scores samples as real or fake. They are trained \emph{against} each other until fakes are indistinguishable from real data.
+	\end{definitionbox}
+
+	% --- Architecture: adversarial game ---
+	\begin{center}
+		\begin{tikzpicture}[
+			font=\footnotesize, >={Stealth[round]}, node distance=6mm,
+			box/.style={rounded corners=1pt, draw, minimum height=8mm, minimum width=20mm, align=center, text=white, font=\footnotesize\bfseries},
+			lbl/.style={align=center, font=\scriptsize}]
+
+			% nodes
+			\node[box, fill=gray!55] (noise) at (0,0) {Random\\Noise $z$};
+			\node[box, fill=blue!70]  (gen)   at (0,-2) {Generator\\$G_\phi$};
+			\node[box, fill=green!55!black] (fake) at (3.6,-2) {Fake\\Data $G(z)$};
+			\node[box, fill=yellow!75!black, text=black] (real) at (3.6,0) {Real\\Data $x$};
+			\node[box, fill=magenta!70] (disc) at (7.4,-1) {Discriminator\\$D_\theta$};
+			\node[lbl] (score) at (10.3,-1) {score\\real / fake};
+
+			% edges
+			\draw[->] (noise) -- (gen);
+			\draw[->] (gen)   -- (fake);
+			\draw[->] (real)  -- (disc);
+			\draw[->] (fake)  -- (disc);
+			\draw[->] (disc)  -- (score);
+
+			% captions
+			\node[lbl, blue!70!black] at (0,-3.1) {learns to fool $D$};
+			\node[lbl, magenta!60!black] at (7.4,-2.2) {learns to tell real from fake};
+			\node[font=\scriptsize] at (7.4,0.9) {$D_\theta(x)=\begin{cases}1 & x:\text{real}\\ 0 & x:\text{gen}\end{cases}$};
+		\end{tikzpicture}
+	\end{center}
+
+	\begin{formulabox}
+		\textbf{Minimax (value) objective -- the ``adversarial game'':}
+		\[
+		\min_G \max_D \; V(D,G) =
+		\mathbb{E}_{x\sim p_{\text{data}}}[\log D(x)] + \mathbb{E}_{z\sim p_z}[\log(1 - D(G(z)))]
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $D$ \textbf{maximises} $V$: push $D(x)\to 1$ for real, $D(G(z))\to 0$ for fake.
+		\item $G$ \textbf{minimises} $V$: push $D(G(z))\to 1$ so fakes look real.
+		\item $p_{\text{data}}$: true data distribution \quad $p_z$: prior noise (e.g.\ $\mathcal{N}(0,I)$).
+	\end{itemize}
+
+	\medskip
+	\textbf{In practice the game is split into two binary cross-entropy losses}, optimised in alternating steps (real $\to$ label $1$, generated $\to$ label $0$).
+
+	\begin{formulabox}
+		\textbf{Discriminator loss} (generator $G_\phi$ fixed):
+		\[
+		L_{\text{disc}}(D_\theta) = -\tfrac{1}{2}\Big(
+		\mathbb{E}_{x\sim p_{\text{real}}}[\log D_\theta(x)] +
+		\mathbb{E}_{z\sim p_{\text{latent}}}[\log(1 - D_\theta(G_\phi(z)))]\Big)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Small} when $D_\theta(\cdot)$ is close to $1$ for real $x$ and close to $0$ for generated $x$; \textbf{large} the other way around.
+	\end{itemize}
+
+	\begin{formulabox}
+		\textbf{Generator loss} (discriminator $D_\theta$ fixed) -- the \emph{non-saturating} form:
+		\[
+		L_{\text{gen}}(G_\phi) = -\,\mathbb{E}_{z\sim p_{\text{latent}}}[\log(D_\theta(G_\phi(z)))]
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Small} when the discriminator is fooled, $D_\theta(x_{\text{gen}})\approx 1$; \textbf{large} when $D$ correctly recognises generated samples.
+	\end{itemize}
+
+	\begin{importantbox}
+		$L_{\text{gen}}$ has the \textbf{same optima} as just using the negative discriminator loss as target, i.e.\ $L_{\text{gen}} = -L_{\text{disc}}$ (the original minimax game) -- but the $-\log D(G(z))$ form \textbf{behaves better in early training}: it gives $G$ strong gradients while $D$ still easily rejects fakes, avoiding the \textbf{vanishing-gradient} problem of $\log(1-D(G(z)))$.
+	\end{importantbox}
+
+	\medskip
+	\textbf{Training loop} (alternating gradient steps -- $D$ then $G$):
+	\begin{enumerate}[leftmargin=*]
+		\item \textbf{Pick a mini-batch} of samples:
+		\begin{itemize}
+			\item $(z^{(1)},\dots,z^{(m)})$ from the noise prior $p_{\text{latent}}(z)$.
+			\item $(x^{(1)},\dots,x^{(m)})$ from the data distribution $p_{\text{data}}(x)$.
+		\end{itemize}
+		\item \textbf{Update the discriminator} by gradient descent on $L_{\text{disc}}$ (generator from the previous step held fixed):
+		\[ \nabla_\theta L_{\text{disc}}(D_\theta) \]
+		\item \textbf{Update the generator} by gradient descent on $L_{\text{gen}}$ (discriminator from step 2 held fixed):
+		\[ \nabla_\phi L_{\text{gen}}(G_\phi) \]
+	\end{enumerate}
+
+	\begin{importantbox}
+		\textbf{GANs are hard to train.} Two main reasons:
+		\begin{itemize}
+			\item \textbf{Search for a Nash equilibrium} ($\approx$ saddle point): $G$ and $D$ have \emph{opposing} targets, so we need a good \emph{compromise} -- neither network should grow too strong relative to the other.
+			\item \textbf{No convergence guarantee:} unlike standard loss minimisation, there is \emph{no guarantee the loss decreases} -- training can \textbf{oscillate} without converging.
+			\item \textbf{Mode collapse:} the generator fails to represent the full \emph{variety} of the original data, producing only a few distinct samples.
+		\end{itemize}
+	\end{importantbox}
+
+	\begin{examtipbox}
+		\textbf{Likely GAN questions:}
+		\begin{itemize}
+			\item \emph{``Write/explain the minimax objective.''} Know who maximises vs minimises: $D$ maximises ($D(x)\to1$, $D(G(z))\to0$), $G$ minimises. Common trap: swapping the two.
+			\item \emph{``Why use the non-saturating generator loss $-\log D(G(z))$ instead of $\log(1-D(G(z)))$?''} $\to$ same optima, but stronger gradients for $G$ early on (avoids vanishing gradients when $D$ easily rejects fakes).
+			\item \emph{``What is mode collapse / why are GANs hard to train?''} $\to$ no guaranteed loss decrease, oscillations, search for a Nash equilibrium (saddle point), neither net should dominate.
+			\item \emph{``Describe one training iteration.''} $\to$ alternating: update $D$ ($\nabla_\theta L_{\text{disc}}$) then $G$ ($\nabla_\phi L_{\text{gen}}$) on a mini-batch of real + noise samples.
+			\item \emph{Compare/contrast with VAE} $\to$ GAN: sharp samples, unstable, no explicit likelihood; VAE: blurry but stable, principled latent space.
+		\end{itemize}
+		\textbf{Common mistakes:} confusing $G$/$D$ roles or labels (real$=1$, fake$=0$); claiming the loss always decreases; forgetting the two updates are \emph{alternating} (not simultaneous).
+	\end{examtipbox}
+
+	\subsection{Diffusion Models}
+
+	\begin{definitionbox}
+		A \textbf{diffusion model} learns to generate data by reversing a gradual noising process. A fixed \textbf{forward process} $q$ destroys the data by adding small amounts of Gaussian noise over $T$ steps until it becomes pure noise; a learned \textbf{reverse process} $p_\theta$ denoises step by step to turn noise back into a sample. State of the art for image generation (e.g.\ Stable Diffusion).
+	\end{definitionbox}
+
+	\textbf{(Forward) Diffusion Process} -- fixed, no learning; gradually corrupts $x_0\to x_T$:
+
+
+	\begin{formulabox}
+		\textbf{One forward (noising) step} -- reparameterized sampling:
+		\[
+			x_t = \sqrt{1-\beta_t}\,x_{t-1} + \sqrt{\beta_t}\,\epsilon,
+			\qquad \epsilon \sim \mathcal{N}(0,\mathbf{1}_d)
+		\]
+		equivalently a Gaussian transition kernel
+		\[
+			q(x_t\mid x_{t-1}) = \mathcal{N}\!\big(x_t;\ \sqrt{1-\beta_t}\,x_{t-1},\ \beta_t\mathbf{1}_d\big)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $x_t$: noisy sample at step $t$; \quad $x_0$: clean data, $x_T$: (almost) pure noise.
+		\item $\beta_t$: \textbf{variance schedule} -- amount of noise added at step $t$ (small, increasing).
+		\item $\epsilon$: standard Gaussian noise; $\mathbf{1}_d$: $d$-dim identity covariance.
+	\end{itemize}
+
+	\begin{importantbox}
+		Choose \textbf{small} $\beta_t$ and \textbf{sufficiently many steps} $T$ ($T\approx 1000$) so $x_T$ ends up as \textbf{pure noise}. The forward process has \emph{no parameters}; the goal is to \textbf{learn to revert} it, i.e.\ to estimate the unknown reverse step $q(x_{t-1}\mid x_t)$.
+	\end{importantbox}
+
+	\textbf{Denoising Diffusion Probabilistic Models (DDPM)} -- a neural net learns the reverse:
+
+	\begin{center}
+	\begin{tikzpicture}[node distance=14mm, font=\small, >={Stealth[round]},
+		st/.style={circle, draw, minimum size=9mm, inner sep=0pt},
+		noise/.style={st, fill=gray!55},
+		mid/.style={st, fill=gray!30},
+		clean/.style={st, fill=white}]
+		% chain left (noise) -> right (data)
+		\node[noise] (xT) {$x_T$};
+		\node[right=8mm of xT] (dotsL) {$\cdots$};
+		\node[mid, right=8mm of dotsL] (xt) {$x_t$};
+		\node[mid, right=of xt] (xt1) {$x_{t-1}$};
+		\node[right=8mm of xt1] (dotsR) {$\cdots$};
+		\node[clean, right=8mm of dotsR] (x0) {$x_0$};
+		% priors
+		\node[font=\scriptsize, above=1mm of xT] {$p_\theta(x_T)$};
+		\node[font=\scriptsize, above=1mm of x0] {$p_\theta(x_0)$};
+		% reverse (learned) chain, point right toward data
+		\draw[->] (xT) -- (dotsL);
+		\draw[->] (dotsL) -- (xt);
+		\draw[->, blue, thick] (xt) -- node[above=2mm, font=\scriptsize, blue]{$p_\theta(x_{t-1}\mid x_t)$} (xt1);
+		\draw[->] (xt1) -- (dotsR);
+		\draw[->] (dotsR) -- (x0);
+		% forward (noising) step below, point left toward noise
+		\draw[->, gray] (xt1.south) to[bend left=15]
+			node[below, font=\scriptsize]{$q(x_t\mid x_{t-1})$} (xt.south);
+		% labels
+		\node[blue, font=\scriptsize\bfseries, align=center, above=12mm of xt] (rev)
+			{Reverse Diffusion: De-Noising \emph{(learned)} $\Rightarrow$};
+		\node[green!50!black, font=\scriptsize\bfseries, align=center, below=2mm of rev] (nn) {Neural\\Network};
+		\draw[->, green!50!black] (nn.south) to[bend right=10] ($(xt)!0.2!(xt1)+(0,0.65)$);
+		\node[gray, font=\scriptsize\bfseries, align=center, below=8mm of xt]
+			{$\Leftarrow$ Forward Diffusion: Adding Noise (per schedule)};
+	\end{tikzpicture}
+	\end{center}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Reverse} (right-ward, blue): the \textbf{neural network} $p_\theta(x_{t-1}\mid x_t)$ learns to denoise -- this is what is trained.
+		\item \textbf{Forward} (left-ward, gray): fixed noising $q(x_t\mid x_{t-1})$ provides the training targets.
+		\item In practice the net predicts the \textbf{noise} $\epsilon$ added at each step; loss is a simple $\|\epsilon - \epsilon_\theta(x_t,t)\|^2$ regression.
+	\end{itemize}
+
+	\medskip
+	\textbf{Optimisation Target.} We want maximum likelihood, i.e.\ minimise the \textbf{negative log-likelihood} of the training samples -- but this is \emph{not tractable}:
+	\begin{formulabox}
+		\[
+			-\sum_{x_0}\log\big(p_\theta(x_0)\big)
+			\qquad(\text{\small$x_0$: training samples})
+		\]
+	\end{formulabox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Fix:} bound it by a \textbf{variational upper bound} $L_\theta$ (KL term $\ge 0$, so it is a valid upper bound):
+	\end{itemize}
+	\begin{formulabox}
+		\[
+			-\log\big(p_\theta(x_0)\big) \;\le\;
+			-\log\big(p_\theta(x_0)\big) + D_{\mathrm{KL}}\!\big(q(x_{1:T}\mid x_0)\,\|\,p_\theta(x_{1:T}\mid x_0)\big)
+			\;=:\; L_\theta
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $x_{1:T}$: the whole noised trajectory; $q(x_{1:T}|x_0)$: fixed forward process; $p_\theta(x_{1:T}|x_0)$: learned reverse.
+	\end{itemize}
+
+	\begin{importantbox}
+		After \emph{``some maths''} the bound $L_\theta$ simplifies to a plain \textbf{noise-prediction (denoising) regression} -- this is the loss actually used in DDPM:
+		\[
+			L_{\text{simple}}(\theta) =
+			\mathbb{E}\Big[\,\big\|\,\epsilon - \epsilon_\theta\big(\sqrt{\bar\alpha_t}\,x_0 + \sqrt{1-\bar\alpha_t}\,\epsilon,\ t\big)\,\big\|^2\,\Big]
+		\]
+	\end{importantbox}
+	\begin{itemize}[leftmargin=*]
+		\item $\epsilon_\theta$: \textbf{learnable function} (the neural network) -- predicts the noise.
+		\item $\epsilon \sim \mathcal{N}(0,\mathbf{1}_d)$: the true Gaussian noise to be recovered.
+		\item $\bar\alpha_t = \prod_{s\le t}(1-\beta_s)$: \textbf{noise schedule} -- lets us jump to step $t$ in \emph{one} shot ($x_t=\sqrt{\bar\alpha_t}\,x_0+\sqrt{1-\bar\alpha_t}\,\epsilon$).
+		\item $x_0$: \textbf{sample from the training set}; \quad $t$: \textbf{sampled uniformly} from $\{1,\dots,T\}$.
+	\end{itemize}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Training:} gradient descent on $L_{\text{simple}}(\theta)$ -- sample $x_0$, $t$, $\epsilon$; noise $x_0\to x_t$; have the net predict $\epsilon$; minimise squared error.
+	\end{itemize}
+
+	\medskip
+	\textbf{Training vs.\ Sampling algorithms.}
+
+	\begin{formulabox}
+		\textbf{Algorithm 1 -- Training} (each iteration is \emph{one single step}, no loop over $t$):
+		\begin{enumerate}[leftmargin=2em, itemsep=1pt]
+			\item \textbf{repeat}
+			\item \quad $x_0 \sim q(x_0)$ \hfill {\scriptsize(draw a training sample)}
+			\item \quad $t \sim \mathrm{Uniform}(\{1,\dots,T\})$ \hfill {\scriptsize(random step)}
+			\item \quad $\epsilon \sim \mathcal{N}(\mathbf{0},\mathbf{I})$
+			\item \quad gradient descent step on $\big\|\,\epsilon - \epsilon_\theta(\underbrace{\sqrt{\bar\alpha_t}\,x_0 + \sqrt{1-\bar\alpha_t}\,\epsilon}_{=\,x_t},\ t)\,\big\|^2$
+			\item \textbf{until} converged
+		\end{enumerate}
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $t$ is fed to the net as a \textbf{sufficiently powerful encoding of time} (e.g.\ sinusoidal positional embedding) so one network handles all steps.
+	\end{itemize}
+
+	\begin{formulabox}
+		\textbf{Algorithm 2 -- Sampling} (generate from noise, $T$ sequential denoising steps):
+		\begin{enumerate}[leftmargin=2em, itemsep=1pt]
+			\item $x_T \sim \mathcal{N}(\mathbf{0},\mathbf{I})$ \hfill {\scriptsize(start from pure noise)}
+			\item \textbf{for} $t = T,\dots,1$ \textbf{do}
+			\item \quad $z \sim \mathcal{N}(\mathbf{0},\mathbf{I})$ \; (and $z=\mathbf{0}$ at $t=1$)
+			\item \quad $x_{t-1} = \dfrac{1}{\sqrt{\alpha_t}}\Big(x_t - \dfrac{1-\alpha_t}{\sqrt{1-\bar\alpha_t}}\,\epsilon_\theta(x_t,t)\Big) + \sigma_t\, z$
+			\item \textbf{end for}
+			\item \textbf{return} $x_0$
+		\end{enumerate}
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $\alpha_t = 1-\beta_t$, \; $\bar\alpha_t = \prod_{s\le t}\alpha_s$, \; $\sigma_t$: per-step noise scale (e.g.\ $\sqrt{\beta_t}$).
+		\item Sampling needs \textbf{$T\approx1000$ sequential steps} (each a full net pass) $\Rightarrow$ \textbf{slow} -- the main drawback vs.\ GAN/VAE (one forward pass).
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{Asymmetry to remember:} \emph{training} is \textbf{one step at a time} (sample a random $t$, predict its noise -- cheap); \emph{sampling} is the \textbf{full $T$-step chain} run sequentially -- this is why diffusion is high-quality but slow to sample.
+	\end{importantbox}
+
 	\subsection{Exam Tips}
+
+	\begin{examtipbox}
+		\textbf{Likely diffusion questions:}
+		\begin{itemize}
+			\item \emph{``Describe the forward vs reverse process.''} $\to$ forward $q$ is \textbf{fixed} (adds Gaussian noise per schedule $\beta_t$), reverse $p_\theta$ is \textbf{learned} (denoises). Don't swap which one is learned.
+			\item \emph{``Write the forward step.''} $\to$ $x_t=\sqrt{1-\beta_t}\,x_{t-1}+\sqrt{\beta_t}\,\epsilon$, i.e.\ $q(x_t|x_{t-1})=\mathcal{N}(\sqrt{1-\beta_t}\,x_{t-1},\beta_t\mathbf{1})$.
+			\item \emph{``Why many steps / small $\beta_t$?''} $\to$ small per-step changes make each reverse step nearly Gaussian (so a net can model it); $T\approx1000$ to reach pure noise.
+			\item \emph{``What does the network predict?''} $\to$ usually the added noise $\epsilon$; trained with an $\ell_2$ noise-prediction loss.
+			\item \emph{``Why not just maximise likelihood directly?''} $\to$ NLL $-\sum\log p_\theta(x_0)$ is \textbf{intractable}; bound it by the variational $L_\theta$ (KL $\ge0$), which simplifies to $L_{\text{simple}}$. Know that $\bar\alpha_t$ lets you noise $x_0\to x_t$ in one step, and $t$ is drawn uniformly.
+			\item \emph{``Contrast training vs sampling.''} $\to$ training $=$ \textbf{one random step} per update (cheap); sampling $=$ \textbf{$T\approx1000$ sequential} denoising passes (slow). Common trap: thinking training also loops over all $T$ steps.
+		\end{itemize}
+	\end{examtipbox}
 	
 	\begin{examtipbox}
 		VAE: blurry but stable, principled latent space. GAN: sharp samples, unstable training, mode collapse. Diffusion: high quality, slow sampling (many steps). Remember the reparameterization trick is what lets VAEs backprop through sampling.
 	\end{examtipbox}
-	
-		
+
+	\subsection{Wrap-up: GAN vs.\ VAE vs.\ Diffusion}
+
+	\begin{definitionbox}
+		\textbf{The generative learning trilemma.} A generative model ideally wants \textbf{(1) high-quality samples}, \textbf{(2) fast sampling}, and \textbf{(3) mode coverage / diversity}. In practice each family achieves only \textbf{two of the three}.
+	\end{definitionbox}
+
+	\begin{center}
+	\begin{tikzpicture}[font=\small, >={Stealth[round]},
+		corner/.style={circle, draw, very thick, minimum size=22mm, align=center, font=\footnotesize\bfseries}]
+		% three corners of the triangle
+		\node[corner] (HQ)  at (0,3.2)    {High\\Quality\\Samples};
+		\node[corner] (FS)  at (-3.2,-1)  {Fast\\Sampling};
+		\node[corner] (MC)  at (3.2,-1)   {Mode\\Coverage\\/ Diversity};
+		% GAN: HQ + FS (blue), missing diversity
+		\draw[blue, dash dot, thick] (HQ) -- (FS);
+		% Diffusion: HQ + MC (red), missing speed
+		\draw[red, dashed, thick] (HQ) -- (MC);
+		% VAE / Normalizing Flows: FS + MC (orange), missing quality
+		\draw[orange, densely dashed, thick] (FS) -- (MC);
+		% family labels along each edge
+		\node[blue, align=center, font=\footnotesize\bfseries] at (-3.4,1.7)
+			{Generative\\Adversarial\\Networks};
+		\node[red, align=center, font=\footnotesize\bfseries] at (3.5,1.7)
+			{Denoising\\Diffusion\\Models};
+		\node[orange, align=center, font=\footnotesize\bfseries] at (0,-2.6)
+			{Variational Autoencoders,\\Normalizing Flows};
+	\end{tikzpicture}
+	\end{center}
+	\begin{itemize}[leftmargin=*]
+		\item \textcolor{blue}{\textbf{GANs}}: high quality $+$ fast $-$ \emph{weak diversity} (mode collapse).
+		\item \textcolor{red}{\textbf{Diffusion}}: high quality $+$ diverse $-$ \emph{slow} ($T\approx1000$ steps).
+		\item \textcolor{orange!85!black}{\textbf{VAEs / flows}}: fast $+$ diverse $-$ \emph{lower sample quality} (blurry).
+	\end{itemize}
+
+	\begin{center}
+	\begin{tabular}{@{}lcccc@{}}
+		\toprule
+		& \textbf{Sample quality} & \textbf{Sampling speed} & \textbf{Diversity} & \textbf{Training} \\
+		\midrule
+		VAE       & blurry        & fast (1 pass)      & good   & stable, ELBO \\
+		GAN       & sharp         & fast (1 pass)      & poor (collapse) & unstable, minimax \\
+		Diffusion & sharp/SOTA    & slow ($T$ steps)   & good   & stable, denoising MSE \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Likelihood:} VAE optimises a likelihood bound (ELBO); diffusion optimises a likelihood bound too ($L_\theta$); GAN has \emph{no explicit likelihood} (implicit, adversarial).
+		\item \textbf{Latent space:} VAE has a structured, low-dim latent $z$ (good for interpolation); GAN maps noise $z\to x$; diffusion's ``latent'' is the same dimensionality as $x$ (the noise $x_T$).
+	\end{itemize}
+
+	\begin{examtipbox}
+		\textbf{Trilemma is an examiner favourite.} Be ready to: \emph{place each family on the triangle} (which 2 of 3 it gets, which it sacrifices), and justify -- \textbf{GAN} sacrifices diversity, \textbf{diffusion} sacrifices speed, \textbf{VAE/flows} sacrifice quality. Common follow-ups: ``why is diffusion slow?'' ($T\!\approx\!1000$ sequential passes), ``why does the GAN lack diversity?'' (mode collapse), ``which has an explicit likelihood?'' (VAE/diffusion bound, \emph{not} GAN).
+	\end{examtipbox}
+
 \end{document}
