@@ -68,214 +68,988 @@
 	% ==================================================
 	\section{Introduction to Deep Learning}
 	% ==================================================
-	
+
 	\begin{definitionbox}
-		Deep Learning is a subset of Machine Learning based on multi-layer neural networks that learn hierarchical feature representations directly from data.
+		Deep Learning is a subset of Machine Learning based on multi-layer neural networks that learn hierarchical feature representations directly from data. \textbf{AI $\supset$ ML $\supset$ Neural Nets $\supset$ DL.}
 	\end{definitionbox}
-	
-	\subsection{Machine Learning vs Deep Learning}
-	
-	\subsection{Machine Learning Definition}
-	
-	\subsection{Deep Learning Definition}
-	
-	
+
+	% --------------------------------------------------
+	\subsection{What is Machine Learning?}
+	% --------------------------------------------------
+
+	\begin{definitionbox}
+		\textbf{ML} = computer methods that analyse observation data to automatically \emph{detect patterns}, then use those patterns to perform tasks / make decisions on \emph{new, unseen} data.
+	\end{definitionbox}
+
+	\textbf{Three classic definitions (know who said what):}
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Author & Year & Definition (core idea) \\
+			\midrule
+			A. Samuel  & 1959 & Computers learn \emph{without being explicitly programmed}. \\
+			T. Mitchell & 1997 & Learns from experience \textbf{E} w.r.t.\ task \textbf{T} \& measure \textbf{P}. \\
+			K. Murphy  & 2012 & Detect patterns, then predict / decide \emph{under uncertainty}. \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Mitchell's E/T/P:} a program learns from \textbf{E}xperience w.r.t.\ \textbf{T}ask if its performance on T, measured by \textbf{P}, improves with E. The \textbf{performance measure P} is the key concept: it defines the loss/objective used for learning and tuning.
+	\end{importantbox}
+
+	% --------------------------------------------------
+	\subsection{Learning Paradigms}
+	% --------------------------------------------------
+
+	\begin{center}
+		\begin{tabular}{p{2.6cm} p{6cm} p{5.2cm}}
+			\toprule
+			Paradigm & Goal & Data \\
+			\midrule
+			\textbf{Supervised}   & Learn a mapping $x \mapsto y$ from labelled examples & Pairs $\{(x_i, y_i)\}$ \\
+			\textbf{Unsupervised} & Discover interesting structure / groups in the data & Inputs $\{x_i\}$ only (no labels) \\
+			\textbf{Reinforcement}& Learn actions that maximise a reward signal & Reward from interaction \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Supervised} examples: recognition, diagnosis, prediction, planning, robot control.
+		\item \textbf{Unsupervised} examples: market segmentation, social-network analysis, clustering.
+		\item \textbf{Reinforcement} examples: learning to play games (Atari, Go), robot locomotion.
+	\end{itemize}
+
+	% --------------------------------------------------
+	\subsection{The (Classical) Machine Learning Process}
+	% --------------------------------------------------
+
+	\begin{definitionbox}
+		Supervised learning: extract features $x$ from raw observations $o$, then learn a mapping $x \mapsto y$ from a labelled \textbf{training set}. The model performs only as well as it captures the data's hidden statistical distribution.
+	\end{definitionbox}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		node distance=6mm and 9mm,
+		box/.style={draw, rounded corners, minimum height=8mm, minimum width=20mm, align=center, font=\small},
+		stage/.style={font=\scriptsize\itshape, text=gray},
+		>=Stealth]
+		% training row
+		\node[box] (pre1) {Pre-\\processing};
+		\node[box, right=of pre1] (feat1) {Feature\\Extraction};
+		\node[box, right=of feat1] (train) {Model\\Training};
+		\node[left=of pre1, font=\small] (tr) {Train set};
+		% model store
+		\node[draw, cylinder, shape border rotate=90, aspect=0.25, minimum width=12mm, minimum height=9mm, below=10mm of train, font=\scriptsize] (model) {Model};
+		% testing row
+		\node[box, below=18mm of pre1] (pre2) {Pre-\\processing};
+		\node[box, right=of pre2] (feat2) {Feature\\Extraction};
+		\node[box, right=of feat2] (clf) {Classifi-\\cation};
+		\node[box, right=of clf] (post) {Post-proc.\\/ Decision};
+		\node[left=of pre2, font=\small] (te) {Test set};
+		% arrows training
+		\draw[->] (tr) -- (pre1);
+		\draw[->] (pre1) -- (feat1);
+		\draw[->] (feat1) -- (train);
+		\draw[->] (train) -- (model);
+		% arrows testing
+		\draw[->] (te) -- (pre2);
+		\draw[->] (pre2) -- (feat2);
+		\draw[->] (feat2) -- (clf);
+		\draw[->] (clf) -- (post);
+		\draw[->] (post) -- ++(1.6,0) node[right, font=\small] {$\hat y$};
+		\draw[->] (model) -- (clf);
+		% stage labels
+		\node[stage, below=1mm of pre2] {Raw data $o$};
+		\node[stage, below=1mm of feat2] {Features $x$};
+		\node[stage, below=1mm of post] {Class scores};
+		% phase labels
+		\node[font=\small\bfseries, above=2mm of pre1] {TRAINING};
+		\node[font=\small\bfseries, above=2mm of pre2, yshift=-2mm] {};
+	\end{tikzpicture}
+	\end{center}
+	\noindent\footnotesize Top = \textbf{training} (build the model); bottom = \textbf{testing/inference} (apply the model). Both share the same preprocessing + feature-extraction steps.\normalsize
+
+	\begin{importantbox}
+		\textbf{Limitations of classical (supervised) ML} --- the 3 problems DL addresses:
+		\begin{enumerate}[leftmargin=*]
+			\item Needs \textbf{large quantities of human-validated labels} $\rightarrow$ costly to build.
+			\item Needs \textbf{even more data + complex mappings} to handle input variability.
+			\item Needs a lot of \textbf{hand-crafted feature engineering} to build good inputs $x$.
+		\end{enumerate}
+	\end{importantbox}
+
+	% --------------------------------------------------
+	\subsection{What is Deep Learning?}
+	% --------------------------------------------------
+
+	\begin{definitionbox}
+		\textbf{Deep Learning} = neural architectures with \emph{many} layers and neurons that \textbf{learn the feature extraction automatically} (representation learning), instead of relying on hand-crafted features.
+	\end{definitionbox}
+
+	\textbf{DL emerged at the convergence of three enablers:}
+	\begin{center}
+		\begin{tabular}{ll}
+			\toprule
+			Enabler & Examples \\
+			\midrule
+			Larger quantities of data & text, audio, images, videos \\
+			New algorithms            & CNN, RNN/LSTM, Transformers, Autoencoders, GANs \\
+			Better compute            & GPUs, distributed computing \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\textbf{ML vs DL --- the key difference (feature engineering):}
+	\begin{center}
+		\begin{tabular}{p{3.2cm} p{5.2cm} p{5.2cm}}
+			\toprule
+			& Classical ML & Deep Learning \\
+			\midrule
+			Features      & Hand-engineered (manual) & Learned automatically \\
+			Pipeline      & Feature extraction \emph{then} classification & Feature extraction \textbf{+} classification jointly \\
+			Models        & Simpler, fewer params & Flexible, powerful, many params \\
+			Trade-off     & Easier to interpret & Harder to tune/interpret, needs more data \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\textbf{Scaling of "depth" over time:}
+	\begin{center}
+		\begin{tabular}{llll}
+			\toprule
+			Era & Layers & Parameters & Training \\
+			\midrule
+			1990's & 3        & $\sim$50K          & months on CPU \\
+			2010's & 10--20   & $\sim$60M          & days/weeks on 1 GPU \\
+			2020's & up to 100& 100's of billions  & months on 1000s of GPUs \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	\footnotesize e.g.\ GPT-3: 175B params; Switch Transformer: 1.6T params.\normalsize
+
+	% --------------------------------------------------
+	\subsection{DL as a Sub-Branch of ML (Taxonomy)}
+	% --------------------------------------------------
+
+	\begin{center}
+	\begin{tikzpicture}[
+		grp/.style={draw, rounded corners, align=left, inner sep=2mm, font=\footnotesize, fill=blue!4},
+		>=Stealth]
+		\node[grp] (ml) {\textbf{Machine Learning}\\Regression\\Decision Trees\\Random Forests\\\underline{Neural Nets}\\SVM, Clustering, PCA};
+		\node[grp, right=12mm of ml] (nn) {\textbf{Neural Nets}\\Shallow Nets\\\underline{Deep Nets}};
+		\node[grp, right=12mm of nn] (dl) {\textbf{Deep Learning}\\MLP\\CNN\\RNN, LSTM\\Autoencoder, GAN\\Transformer};
+		\draw[->, red, thick] (ml.east) -- (nn.west);
+		\draw[->, red, thick] (nn.east) -- (dl.west);
+	\end{tikzpicture}
+	\end{center}
+	\noindent\footnotesize Some ML fundamentals apply equally to DL (covered in this course); DL-specific techniques are often illustrated first with shallow neural nets.\normalsize
+
+	\begin{importantbox}
+		\textbf{How DL answers the 3 ML limitations (wrap-up):}
+		\begin{enumerate}[leftmargin=*]
+			\item Use \textbf{all} data --- labelled \emph{and} unlabelled (scalability on large datasets).
+			\item Use \textbf{deep neural networks} to train complex mapping functions.
+			\item \textbf{Learn} the feature extraction (un/self-supervised) $\rightarrow$ \emph{representation learning}.
+		\end{enumerate}
+	\end{importantbox}
+
+	% --------------------------------------------------
+	\subsection{Exam Tips}
+	% --------------------------------------------------
+
+	\begin{examtipbox}
+		Likely questions:
+		\begin{itemize}[leftmargin=*]
+			\item \emph{"Define ML in your own words"} --- give Mitchell's E/T/P and name P as the objective.
+			\item \emph{"Difference between ML and DL?"} --- DL \textbf{learns features}; classical ML needs hand-crafted features. DL = more data + new algorithms + GPUs.
+			\item \emph{Compare/contrast} supervised vs unsupervised vs reinforcement learning (goal + data type).
+			\item \emph{"Why deep learning now?"} --- the three enablers (data, algorithms, compute).
+		\end{itemize}
+		\textbf{Common mistakes:} confusing supervised (labels $y$) with unsupervised (no labels); claiming DL needs \emph{less} data (it needs \emph{more}); forgetting that DL merges feature extraction \textbf{and} classification.
+	\end{examtipbox}
+
+
 	% ==================================================
 	\section{Numpy and Tensors Basics}
 	% ==================================================
 	
-	\subsection{Core Concepts}
-	
+	\subsection{Python Lists vs NumPy Arrays vs Tensors}
+
 	\begin{definitionbox}
-		\textbf{AI $\supset$ ML $\supset$ DL.} Classical ML relies on hand-crafted features; deep learning \emph{learns} the features. Performance typically scales with data and model size.
+		A \textbf{list} is an ordered sequence of items, each identified by an \textbf{index}. Size can grow/shrink; items may be of \emph{different} types.
 	\end{definitionbox}
-	
+
+	\textbf{Indexing \& slicing} (lists \emph{and} arrays share this) --- notation \texttt{L[i:j:s]}:
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{Representation learning}: each layer transforms the input into a more abstract representation.
-		\item \textbf{End-to-end learning}: from raw input to output, no manual feature engineering.
-		\item Why now: large datasets, GPUs, better optimization \& initialization.
+		\item \texttt{i} = start (incl.), \texttt{j} = end (\textbf{excl.}), \texttt{s} = step (optional).
+		\item Index starts at \textbf{0}; \textbf{negative} indices count from the end ($-1$ = last).
+		\item Out-of-bound index $\rightarrow$ \texttt{IndexError}. \texttt{len(L)} gives the size.
 	\end{itemize}
-	
-	\subsection{Tensors}
-	
-	\begin{definitionbox}
-		A \textbf{tensor} is an $n$-dimensional array, the basic data structure of deep learning.
-	\end{definitionbox}
-	
+
 	\begin{center}
 		\begin{tabular}{lll}
 			\toprule
-			Rank & Name & Example shape \\
+			& \textbf{list} & \textbf{numpy array / tensor} \\
 			\midrule
-			0 & Scalar & \texttt{()} \\
-			1 & Vector & \texttt{(d,)} \\
-			2 & Matrix & \texttt{(m, n)} \\
-			3 & 3-tensor & \texttt{(c, h, w)} image \\
-			4 & 4-tensor & \texttt{(b, c, h, w)} batch \\
+			Item types   & Heterogeneous (mixed) & \textbf{Homogeneous} (one dtype) \\
+			Size         & Dynamic (can grow)    & \textbf{Fixed} once created \\
+			Math support & Very few functions    & Rich math, efficient on CPU/GPU \\
+			Use when     & Storing mixed objects & Doing numerical computation \\
 			\bottomrule
 		\end{tabular}
 	\end{center}
-	
-	\textbf{Key operations}
+
+	\begin{importantbox}
+		\textbf{NumPy is not a base type} --- you must \texttt{import numpy as np} first (alias \texttt{np}). Arrays index/slice like lists but forbid type mixing and resizing.
+	\end{importantbox}
+
+	\textbf{Array creation (common constructors):}
+	\begin{multicols}{2}
+		\begin{itemize}[leftmargin=*]
+			\item \texttt{np.array([1,2,3])} --- 1D (vector)
+			\item \texttt{np.array([[1,2],[3,4]])} --- 2D (matrix)
+			\item \texttt{np.zeros(10)}, \texttt{np.ones(10)}
+			\item \texttt{np.zeros((3,3))} --- shape tuple
+			\item \texttt{np.linspace(0,10,400)} --- 400 pts
+		\end{itemize}
+	\end{multicols}
+
+	\subsection{Views vs Copies}
+
+	\begin{importantbox}
+		Slicing a NumPy array returns a \textbf{view} (\emph{vue}), \emph{not} a copy: modifying the view \textbf{modifies the original array}. This differs from lists. Use \texttt{np.copy(a[...])} for an independent copy.
+	\end{importantbox}
+
+	\begin{verbatim}
+    a = np.array([[1,2,3,4],[5,6,7,8],[9,10,11,12]])
+    b = a[:2, 1:3]      # view of a
+    b[0,0] = 77         # also changes a[0,1] -> 77
+\end{verbatim}
+
+	\subsection{Rank (ndim) and Shape}
+
+	\begin{definitionbox}
+		Every array/tensor has two key attributes:
+		\textbf{rank} = number of dimensions (\texttt{ndim}); \textbf{shape} = number of values along each dimension (a tuple).
+	\end{definitionbox}
+
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{Reshape / view}: change shape, keep number of elements.
-		\item \textbf{Broadcasting}: align trailing dimensions; size-1 dims are stretched.
-		\item \textbf{Element-wise} ops vs.\ \textbf{matrix multiplication} (\texttt{@}).
-		\item \textbf{Axis / dim reductions}: sum, mean, max over a chosen axis.
+		\item \texttt{data.ndim} $\rightarrow$ rank (e.g.\ \texttt{2}).
+		\item \texttt{data.shape} $\rightarrow$ sizes (e.g.\ \texttt{(4, 2)}); \texttt{shape[0]} = rows, \texttt{shape[1]} = cols.
+		\item Math ops available: arithmetic, trigonometric, log/exp, linear algebra (vector \& matrix).
 	\end{itemize}
-	
+
+	\subsection{Tensors}
+
+	\begin{definitionbox}
+		A \textbf{tensor} is a generalized matrix: a finite table of numerical values indexed along several discrete dimensions. It is defined by its \textbf{rank} (number of dimensions) and its \textbf{shape} (number of values per dimension).
+	\end{definitionbox}
+
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Rank & Name & Typical example \\
+			\midrule
+			0 & Scalar   & a single number \\
+			1 & Vector   & a sound sample \\
+			2 & Matrix   & a grayscale image \\
+			3 & 3-tensor & an RGB image (vector of matrices) \\
+			4 & 4-tensor & a video / batch of color images \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Why tensors in deep learning?}
+		\begin{itemize}[leftmargin=*]
+			\item Encode the \textbf{signal}, plus the model's internal states \& \textbf{parameters}.
+			\item A dataset is stored as one tensor with the \textbf{first dimension = number $N$ of samples} (batch dim).
+			\item The constrained structure lets CPUs/GPUs run at near-peak performance (linear algebra + DL ops: convolution, pooling).
+		\end{itemize}
+		\textbf{Implementations:} NumPy (CPU only); PyTorch / TensorFlow (CPU \textbf{and} GPU), with easy conversion to/from NumPy arrays.
+	\end{importantbox}
+
+	\subsection{Worked Examples: Rank \& Shape}
+
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Object & Rank & Shape \\
+			\midrule
+			Grayscale image $900\times550$        & 2 & \texttt{(550, 900)} \\
+			Color (RGB) image $320\times480$      & 3 & \texttt{(480, 320, 3)} \\
+			2D word embedding (e.g.\ \texttt{beer}) & 1 & \texttt{(2,)} \\
+			Stereo sound, 2\,s @ 44.1\,kHz        & 2 & \texttt{(2, 88200)} \\
+			MNIST --- one image ($28\times28$)     & 2 & \texttt{(28, 28)} \\
+			MNIST --- whole dataset                & 3 & \texttt{(60000, 28, 28)} \\
+			MNIST --- batch of 32                  & 3 & \texttt{(32, 28, 28)} \\
+			Batch of RGB videos (5D)              & 5 & \texttt{(N, frames, H, W, 3)} \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	\noindent\footnotesize Convention used: (height, width[, channels]); samples/batch on the first axis. Stereo: $2\,\text{s}\times44100 = 88200$ samples per channel. \normalsize
+
 	\subsection{Important Formula}
-	
+
 	\begin{formulabox}
 		\[
 		(A B)_{ij} = \sum_{k} A_{ik} B_{kj}, \qquad A \in \mathbb{R}^{m\times k},\; B \in \mathbb{R}^{k\times n}
 		\]
 	\end{formulabox}
-	
+	\begin{itemize}[leftmargin=*]
+		\item $A$: left matrix $m\times k$; \quad $B$: right matrix $k\times n$; \quad result: $m\times n$.
+	\end{itemize}
+
 	\subsection{Exam Tips}
-	
+
 	\begin{examtipbox}
-		Inner dimensions must match for matrix multiplication. Be able to compute output shapes after reshape/broadcast/matmul. Convention: batch dimension is first (\texttt{(b, \dots)}).
+		Likely questions:
+		\begin{itemize}[leftmargin=*]
+			\item \emph{"Give the rank and shape of \dots"} (image / sound / dataset / batch) --- the favourite question; practise the worked-examples table.
+			\item \emph{"Difference between a list and a numpy array?"} --- types (mixed vs homogeneous), size (dynamic vs fixed), math support.
+			\item \emph{"What is a view?"} --- a slice shares memory; editing it edits the original. Use \texttt{np.copy} to avoid.
+		\end{itemize}
+		\textbf{Common mistakes:} confusing \textbf{rank} (\#dims) with \textbf{shape} (sizes); forgetting slicing end index \texttt{j} is \emph{excluded}; forgetting the batch dimension $N$ comes first; assuming a slice is a copy.
 	\end{examtipbox}
 	
 	% ==================================================
 	\section{Learning and Optimisation}
 	% ==================================================
 	
-	\subsection{Core Concepts}
-	
+	\begin{importantbox}
+		\textbf{Notation (this chapter follows the lecture deck):} $C(\theta)$ = cost/loss function (template's $J(\theta)$); $\alpha$ = learning rate (template's $\eta$). $L$ = per-sample loss; $C$ = its average over the dataset.
+	\end{importantbox}
+
+	% --------------------------------------------------
+	\subsection{Learning as an Optimisation Problem}
+	% --------------------------------------------------
+
 	\begin{definitionbox}
-		\textbf{Supervised learning}: given pairs $(x_i, y_i)$, learn parameters $\theta$ of a model $f(x;\theta)$ that minimize the expected loss. We approximate this by \textbf{empirical risk minimization} (ERM).
+		\textbf{Learning} = find parameters $\theta$ of a model $f_\theta(x)$ that minimise a \textbf{cost function} $C(\theta)$ measuring the discrepancy between predictions and targets, averaged over the data.
 	\end{definitionbox}
-	
+
 	\begin{formulabox}
 		\[
-		J(\theta) = \frac{1}{N}\sum_{i=1}^{N} \mathcal{L}\big(f(x_i;\theta),\, y_i\big)
+		C(\theta) = \frac{1}{N}\sum_{i=1}^{N} \big(y^{(i)} - f_\theta(x^{(i)})\big)^2
+		\qquad \theta_* = \operatorname*{arg\,min}_\theta C(\theta)
 		\]
 	\end{formulabox}
-	
-	\subsection{Common Loss Functions}
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{MSE} (regression): $\tfrac{1}{N}\sum (\hat y_i - y_i)^2$
-		\item \textbf{Cross-entropy} (classification): $-\sum_c y_c \log \hat y_c$
-		\item \textbf{Binary cross-entropy}: $-[y\log\hat y + (1-y)\log(1-\hat y)]$
+		\item $(x^{(i)}, y^{(i)})$: training data, $i=1,\dots,N$; \quad $\theta=(\theta_1,\dots,\theta_n)$: parameters.
+		\item $f_\theta$: model (family of functions); \quad $C$: cost (here MSE).
 	\end{itemize}
-	
-	\subsection{Gradient Descent}
-	
+
+	\begin{center}
+		\begin{tabular}{p{3.3cm} p{6.2cm} p{6.2cm}}
+			\toprule
+			& \textbf{Linear regression} & \textbf{General (e.g.\ deep) model} \\
+			\midrule
+			Model       & $f(x;a,b)=a+bx$ (linear \emph{in params}) & $f_\theta(x)$ non-linear in $\theta$ \\
+			Solution    & \textbf{Closed form} (least squares) & \textbf{No closed form} \\
+			How         & $\binom{a_*}{b_*}=(X^\top X)^{-1}X^\top Y$ & Numerical, iterative (gradient descent) \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		A \textbf{closed-form solution exists only for linear regression}. ``Linear in parameters'' $\neq$ linear in the input $x$. For everything else (incl.\ neural nets) we need \textbf{iterative numerical optimisation}.
+	\end{importantbox}
+
+	% --------------------------------------------------
+	\subsection{Gradient Descent (GD)}
+	% --------------------------------------------------
+
+	\begin{definitionbox}
+		The \textbf{gradient} $\nabla C(\theta)$ is the vector of partial derivatives $\partial C/\partial\theta_k$; it points in the direction of \textbf{steepest ascent}. So $-\nabla C$ is the direction of steepest \textbf{descent}.
+	\end{definitionbox}
+
 	\begin{formulabox}
 		\[
-		\theta_{t+1} = \theta_t - \eta\, \nabla_\theta J(\theta_t)
+		\theta^{(t+1)} = \theta^{(t)} - \alpha\,\nabla C\!\left(\theta^{(t)}\right)
+		\qquad
+		\theta_k^{(t+1)} = \theta_k^{(t)} - \alpha\,\frac{\partial C}{\partial \theta_k}\!\left(\theta^{(t)}\right)
 		\]
 	\end{formulabox}
-	
-	\textbf{Variants}
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{Batch GD}: full dataset per step -- stable, slow.
-		\item \textbf{SGD}: one sample per step -- noisy, fast, can escape minima.
-		\item \textbf{Mini-batch GD}: batch of size $B$ -- standard choice.
+		\item $\alpha>0$: learning rate (step size); \quad $t$: iteration number.
+		\item $\theta^{(t)}$ and $\nabla C(\theta^{(t)})$ have the \textbf{same dimensionality}.
 	\end{itemize}
-	
-	\subsection{Exam Tips}
-	
+
+	\textbf{Algorithm:} (1) initialise $\theta^{(0)}$ (e.g.\ random); (2) iterate: compute $\nabla C(\theta^{(t)})$, step in $-\nabla C$ direction; (3) stop when the parameter change is very small.
+
+	\textbf{Why it descends} (Taylor linearisation, $\alpha$ not too large):
+	\begin{formulabox}
+		\[
+		C\!\left(\theta_0 - \alpha\nabla C(\theta_0)\right) \approx C(\theta_0) - \alpha\,\lVert\nabla C(\theta_0)\rVert^2 \;<\; C(\theta_0)
+		\]
+	\end{formulabox}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		node distance=7mm and 14mm,
+		box/.style={draw, rounded corners, minimum height=8mm, align=center, font=\small},
+		>=Stealth]
+		\node[box, fill=gray!15] (model) {Model\\$f_\theta(x)$};
+		\node[box, right=of model] (pred) {Prediction\\$\hat y=f_\theta(x)$};
+		\node[box, below=of pred] (loss) {Truth $y$\\Loss / Cost};
+		\node[left=of model, font=\small] (x) {$x$};
+		\draw[->] (x) -- (model);
+		\draw[->] (model) -- (pred);
+		\draw[->] (pred) -- (loss);
+		\draw[->] (loss) -| (model) node[pos=0.25, below, font=\scriptsize] {update $\Delta\theta=-\alpha\nabla C$};
+	\end{tikzpicture}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Characteristics of GD:}
+		\begin{itemize}[leftmargin=*]
+			\item Works for \textbf{any model} as long as gradients can be computed $\rightarrow$ works for deep nets.
+			\item \textbf{Local}, not global: finds a local minimum; may get stuck in non-optimal critical points. Path depends on initialisation. \textbf{Convex} cost $\Rightarrow$ unique minimum.
+			\item \textbf{Not guaranteed to converge} (e.g.\ if $\alpha$ too large $\rightarrow$ oscillation / divergence).
+		\end{itemize}
+	\end{importantbox}
+
+	\textbf{Computing the gradient:} the model $f(x;\theta)$ is deeply nested in $\theta$ $\rightarrow$ use the \textbf{chain rule of calculus} (this is backpropagation, covered later).
+
+	% --------------------------------------------------
+	\subsection{Classification: Multinomial Logistic Regression}
+	% --------------------------------------------------
+
+	\begin{definitionbox}
+		\textbf{Classification}: data $(x^{(i)},y^{(i)})\in\mathbb{R}^m\times\{c_1,\dots,c_K\}$. The model predicts a probability per class. \textbf{Logistic regression} = (1) linear map to scores (``logits''), then (2) a squashing function to probabilities. $>2$ classes $\Rightarrow$ \emph{multinomial}.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\[
+		z = x\,W^\top + b \quad(\text{logits}), \qquad
+		s_k(z) = \frac{e^{z_k}}{\sum_{j=1}^{K} e^{z_j}} \quad(\text{softmax}), \qquad
+		\hat y = \operatorname*{arg\,max}_k \big(f_\theta(x)\big)_k
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $z$: logits; \quad $s_k$: softmax output ($s_k>0$, $\sum_k s_k=1$) $\rightarrow$ class probabilities.
+		\item MNIST shapes: $x\,(1,784)$, $W\,(10,784)$, $b\,(1,10)$, $z\,(1,10)$; bias neuron $x_0=1$.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		node distance=5mm and 8mm,
+		b/.style={draw, rounded corners, minimum height=7mm, align=center, font=\scriptsize},
+		>=Stealth]
+		\node[b] (img) {image\\$28{\times}28$};
+		\node[b, right=of img] (flat) {flatten\\$(784)$};
+		\node[b, right=of flat] (lin) {linear\\$z=xW^\top{+}b$};
+		\node[b, right=of lin] (soft) {softmax\\probs};
+		\node[b, right=of soft] (arg) {argmax};
+		\node[b, right=of arg] (lab) {label};
+		\draw[->] (img)--(flat); \draw[->] (flat)--(lin); \draw[->] (lin)--(soft);
+		\draw[->] (soft)--(arg); \draw[->] (arg)--(lab);
+	\end{tikzpicture}
+	\end{center}
+
+	% --------------------------------------------------
+	\subsection{Loss Functions}
+	% --------------------------------------------------
+
+	\begin{formulabox}
+		\[
+		L_{\mathrm{MSE}}(u,\hat u)=\tfrac{1}{2}\lVert u-\hat u\rVert^2
+		\qquad
+		L_{\mathrm{CE}}(u,\hat u)=-\sum_l u_l\log\hat u_l = -\log \hat u_k \;\;(\text{$u$ one-hot, }y{=}k)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $u$: target (one-hot for classification); \quad $\hat u=f(x;\theta)$: prediction.
+		\item CE grows very large as $\hat u_k\to 0$ (confident-and-wrong heavily punished).
+	\end{itemize}
+
+	\begin{center}
+		\begin{tabular}{p{3.2cm} p{5.4cm} p{6cm}}
+			\toprule
+			& \textbf{MSE} & \textbf{Cross-entropy (CE)} \\
+			\midrule
+			Use for     & Regression & Classification \\
+			Pairs with  & Linear output & Softmax output \\
+			Gradient    & Flat near 0 \& 1 $\rightarrow$ slow learning & Large when wrong $\rightarrow$ fast learning \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Maximum Likelihood $\Rightarrow$ Cross-Entropy.} Maximising the likelihood of the data equals minimising the negative log-likelihood:
+		\[
+		\hat\theta=\operatorname*{arg\,max}_\theta\prod_i p(y^{(i)}|x^{(i)},\theta)
+		=\operatorname*{arg\,min}_\theta\Big(\!-\!\sum_i \log p(y^{(i)}|x^{(i)},\theta)\Big)=\text{CE cost.}
+		\]
+		Holds for \emph{any} model $p(y|x,\theta)$.
+	\end{importantbox}
+
+	\textbf{Gradient for multinomial logistic regression} (clean result --- softmax\,+\,CE):
+	\begin{formulabox}
+		\[
+		\frac{\partial L_{\mathrm{CE}}}{\partial z_k}=s_k-u_k,
+		\qquad
+		\frac{\partial L_{\mathrm{CE}}}{\partial W_{ij}}=(s_i-u_i)\,x_j,
+		\qquad
+		\frac{\partial L_{\mathrm{CE}}}{\partial b_i}=(s_i-u_i)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $s$: softmax output (prediction $\hat u$); \quad $u$: one-hot target. Update: $W\!\leftarrow\!W-\alpha\frac{1}{N}\sum_i(\hat u^{(i)}-u^{(i)})(x^{(i)})^\top$.
+	\end{itemize}
+
+	% --------------------------------------------------
+	\subsection{Batch vs.\ Stochastic (Mini-Batch) Gradient Descent}
+	% --------------------------------------------------
+
+	\begin{definitionbox}
+		\textbf{(Mini-batch) SGD}: estimate the gradient from a random subset (``mini-batch'') of $N_b$ samples instead of the full dataset, and update after each batch. ``Stochastic'' because batches are composed randomly (reshuffled each epoch).
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\[
+		\nabla C(\theta) \approx \frac{1}{N_b}\sum_{i\in\text{batch}} \nabla_\theta L\big(y^{(i)}, f(x^{(i)};\theta)\big)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $N_b$: batch size. A proxy for the true gradient --- its negative is not necessarily a worse descent direction.
+	\end{itemize}
+
+	\begin{center}
+		\begin{tabular}{p{4.2cm} p{5.3cm} p{5.3cm}}
+			\toprule
+			& \textbf{Batch GD} & \textbf{Mini-batch / SGD} \\
+			\midrule
+			Updates per epoch  & 1 & many \\
+			Time per epoch     & short & longer \\
+			Epochs to converge & many & far fewer $\rightarrow$ faster overall \\
+			Trajectory         & smooth & ``wiggly'' (noisy) \\
+			MNIST (this deck)  & 200 ep, lr 2.5 $\to$ 87.8\% & 20 ep, lr 1.0 $\to$ 91.5\% \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Regularising effect of mini-batches:} gradient noise helps \textbf{escape local / sharp minima}; flatter minima generalise better $\rightarrow$ \textbf{smaller batch often generalises better}. Noise scales as $\epsilon\sim 1/\sqrt{N_b}$.
+	\end{importantbox}
+
+	% --------------------------------------------------
+	\subsection{Hyperparameters \& Evaluation}
+	% --------------------------------------------------
+
+	\begin{definitionbox}
+		\textbf{Hyperparameters} are \emph{not learned} but \emph{tuned} by the modeller (e.g.\ learning rate, batch size).
+	\end{definitionbox}
+
+	\begin{center}
+		\begin{tabular}{p{3cm} p{6cm} p{6cm}}
+			\toprule
+			& \textbf{Learning rate $\alpha$} & \textbf{Batch size $N_b$} \\
+			\midrule
+			Too small & Slow convergence & More noise, more updates, less memory \\
+			Too large & Oscillation / divergence & Less noise, sharp minima, more memory \\
+			Rule      & Tune per problem; normalise data first & Compromise; LeCun: ``$\le 32$'' \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\textbf{Train/Test split \& accuracy:}
+	\begin{itemize}[leftmargin=*]
+		\item Split \textbf{Train $\mid$ Validation $\mid$ Test}; never use test info during training. Shuffle before splitting.
+		\item Ratios: small data $\approx$ 70--80\,/\,20--30; large data $\approx$ 99\,/\,1.
+		\item $\mathrm{acc}=\dfrac{\text{correct predictions}}{\text{total predictions}}$. Train\,$\approx$\,test accuracy \& both low $\Rightarrow$ \textbf{underfitting} (model too simple, as for MLR on MNIST).
+	\end{itemize}
+
+	% --------------------------------------------------
+	\subsection{PyTorch Essentials}
+	% --------------------------------------------------
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Tensor}: has a \texttt{dtype}, lives on a \texttt{device} (CPU/GPU), is a view on 1D storage, supports \textbf{autograd} (computational graph).
+		\item \texttt{Dataset} (indexed samples) $\rightarrow$ \texttt{DataLoader} (batches, \texttt{shuffle}, \texttt{num\_workers}). MNIST: $70\,000$ grayscale $28{\times}28$; \texttt{ToTensor} scales to $[0,1]$; sample $(1,28,28)$, batch $(64,1,28,28)$.
+		\item \texttt{nn.CrossEntropyLoss} combines \textbf{softmax + CE} (numerically robust) $\rightarrow$ \textbf{remove softmax from the model}.
+	\end{itemize}
+
+	\begin{verbatim}
+    for epoch in range(nepochs):
+        uhat = model(X)            # forward
+        cost = cost_ce(uhat, Y)
+        optimizer.zero_grad()      # reset grads
+        cost.backward()            # autograd
+        optimizer.step()           # update params
+    with torch.no_grad():          # no grads for test
+        ...
+\end{verbatim}
+
 	\begin{examtipbox}
-		Cross-entropy pairs with softmax; MSE pairs with linear output. The learning rate $\eta$ is the most important hyperparameter: too large diverges, too small is slow. Always split data into train / validation / test.
+		Likely questions:
+		\begin{itemize}[leftmargin=*]
+			\item \emph{Derive / write the GD update rule} and explain $-\nabla C$ (steepest descent); show via Taylor why the cost decreases.
+			\item \emph{Why no closed-form solution in general?} --- non-linear dependence on $\theta$ (closed form only for linear regression).
+			\item \emph{MSE vs.\ cross-entropy} --- which for classification and \emph{why} (CE gradient stays large; MSE flat $\rightarrow$ slow).
+			\item \emph{Batch vs.\ SGD} --- trade-offs + regularising effect of mini-batch noise.
+			\item \emph{Effect of learning rate / batch size} --- ``what happens if $\alpha$ too large?''
+		\end{itemize}
+		\textbf{Common mistakes:} forgetting softmax is removed when using \texttt{CrossEntropyLoss}; confusing logits with probabilities; mixing up rank vs.\ shape of MNIST batches; claiming GD finds the \emph{global} minimum.
 	\end{examtipbox}
 	
 	% ==================================================
 	\section{MLP, Overfitting, Regularisation}
 	% ==================================================
 	
-	\subsection{Multi-Layer Perceptron}
-	
+	\subsection{Perceptron (Linear Threshold Unit)}
+
 	\begin{definitionbox}
-		An \textbf{MLP} stacks fully-connected layers with non-linear activations. With $\geq 1$ hidden layer and a non-linearity it is a \textbf{universal approximator}.
+		\textbf{Perceptron} (Rosenblatt, 1958): an artificial neuron = weighted sum of inputs + bias, passed through a non-linear \textbf{step} (Heaviside) activation. Output $\in\{0,1\}$.
 	\end{definitionbox}
-	
+
 	\begin{formulabox}
 		\[
-		h^{(l)} = \sigma\!\big(W^{(l)} h^{(l-1)} + b^{(l)}\big), \qquad h^{(0)} = x
+		y = H\!\Big(\sum_{k=1}^{n} w_k x_k + b\Big), \qquad
+		H(z)=\begin{cases}1 & z\ge 0\\ 0 & z<0\end{cases}
 		\]
 	\end{formulabox}
-	
-	\subsection{Artificial Neuron}
-	
-	\begin{formulabox}
-		\[
-		z = w^\top x + b, \qquad a = \sigma(z)
-		\]
-	\end{formulabox}
-	
-	\subsection{Activation Functions}
-	\begin{multicols}{2}
-		\begin{itemize}[leftmargin=*]
-			\item Sigmoid: $\frac{1}{1+e^{-z}}$
-			\item Tanh: zero-centered
-			\item ReLU: $\max(0,z)$
-			\item Leaky ReLU: fixes dying ReLU
-			\item Softmax: probabilities over classes
-		\end{itemize}
-	\end{multicols}
-	
-	\subsection{Overfitting vs.\ Underfitting}
-	
+	\begin{itemize}[leftmargin=*]
+		\item $w_k$: weights; \quad $b$: bias (bias neuron $x_0=1$); \quad $H$: Heaviside step.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tikzpicture}[
+		node distance=4mm and 11mm,
+		n/.style={draw, circle, minimum size=6mm, font=\scriptsize, inner sep=0pt},
+		>=Stealth]
+		\node[n, fill=yellow!40] (x0) {$x_0{=}1$};
+		\node[n, fill=green!25, below=of x0] (x1) {$x_1$};
+		\node[n, fill=green!25, below=of x1] (x2) {$x_2$};
+		\node[below=2mm of x2, font=\scriptsize] (dots) {$\vdots$};
+		\node[n, fill=green!25, below=2mm of dots] (xD) {$x_D$};
+		\node[n, fill=blue!30, right=16mm of x1, yshift=-4mm] (sum) {$\Sigma$};
+		\node[draw, right=7mm of sum, font=\scriptsize, minimum size=6mm] (step) {$H$};
+		\node[n, fill=orange!40, right=7mm of step] (y) {$y$};
+		\draw[->, gray] (x0)--(sum); \draw[->, gray] (x1)--(sum);
+		\draw[->, gray] (x2)--(sum); \draw[->, gray] (xD)--(sum);
+		\draw[->] (sum)--(step); \draw[->] (step)--(y);
+		\node[font=\scriptsize, below=0.5mm of sum] {weighted sum};
+		\node[font=\scriptsize, below=0.5mm of step, yshift=-1mm] {step};
+	\end{tikzpicture}
+	\end{center}
+
+	\textbf{Learning rule} (online, if $\hat y\neq y$): $w\leftarrow w-\alpha(\hat y-y)x$, \; $b\leftarrow b-\alpha(\hat y-y)$, with $(\hat y-y)\in\{0,+1,-1\}$.
+
 	\begin{importantbox}
+		Decision boundary is a \textbf{hyperplane} $\{x\in\mathbb{R}^D : w\cdot x+b=0\}$. The perceptron only works for \textbf{linearly separable} binary problems. \textbf{XOR is not linearly separable} $\rightarrow$ a single perceptron cannot solve it $\Rightarrow$ stack layers (MLP).
+	\end{importantbox}
+
+	\subsection{Multi-Layer Perceptron (MLP)}
+
+	\begin{definitionbox}
+		An \textbf{MLP} = (1) combine many perceptrons in one layer, (2) stack layers. Each unit computes a weighted sum of the previous layer's outputs + activation. The output is a \textbf{non-linear mapping} of the input parametrised by all weights and biases. With $\geq 1$ hidden layer + non-linearity it is a \textbf{universal approximator}.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\[
+		h^{(l)} = \sigma\!\big(W^{(l)} h^{(l-1)} + b^{(l)}\big), \qquad h^{(0)} = x, \qquad \hat u = f_\theta(x)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $h^{(l)}$: activations of layer $l$; \quad $W^{(l)}, b^{(l)}$: weights \& bias; \quad $\sigma$: activation.
+		\item \textbf{PyTorch}: \texttt{nn.Linear}, \texttt{nn.Flatten}, \texttt{nn.ReLU/Sigmoid}, or compose with \texttt{nn.Sequential}. Params of \texttt{Linear(in,out)} $= \text{in}\cdot\text{out}+\text{out}$.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{MNIST results (1 hidden layer vs logistic regression):}
 		\begin{itemize}[leftmargin=*]
-			\item \textbf{Underfitting}: high bias -- model too simple, poor on train \& test.
-			\item \textbf{Overfitting}: high variance -- low train error, high test error.
-			\item \textbf{Bias--variance trade-off}: total error balances the two.
+			\item One hidden layer with $\ge 100$ units $\rightarrow$ $\sim$\,6\% test-accuracy gain.
+			\item Beyond $\ge 200$ units (or more layers): little further test gain on MNIST.
+			\item Training accuracy can be driven to \textbf{100\%} $\rightarrow$ overfitting risk.
 		\end{itemize}
 	\end{importantbox}
-	
-	\subsection{Regularisation}
+
+	\subsection{Activation Functions}
+
+	\begin{center}
+		\begin{tabular}{lll}
+			\toprule
+			Name & Formula & Note \\
+			\midrule
+			Sigmoid & $\sigma(z)=\dfrac{1}{1+e^{-z}}$ & output $(0,1)$ \\
+			Tanh    & $\tanh(z)=\dfrac{e^z-e^{-z}}{e^z+e^{-z}}$ & zero-centred $(-1,1)$ \\
+			ReLU    & $\max(0,z)$ & cheap, default for hidden layers \\
+			Softmax & $\dfrac{e^{z_k}}{\sum_j e^{z_j}}$ & class probabilities (output) \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	\noindent\footnotesize Activations must be \textbf{non-linear} --- otherwise stacked linear layers collapse to one linear map.\normalsize
+
+	\subsection{Empirical Risk Minimisation (ERM)}
+
+	\begin{definitionbox}
+		The \textbf{loss} $L(f,(x,y))\ge 0$ scores one sample (e.g.\ classification $L=-\log f_y(x)$). Data is drawn from an unknown distribution $Z=(X,Y)\sim P$. The \textbf{statistical / expected risk} is $R(f)=\mathbb{E}_{Z\sim P}[L(f,Z)]$.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\[
+		f_{\hat\theta(D_N)} = \operatorname*{arg\,min}_\theta \frac{1}{N}\sum_{i=1}^{N} L\big(f_\theta, z^{(i)}\big)
+		\]
+	\end{formulabox}
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{L2 (weight decay)}: $J + \lambda\|w\|_2^2$ -- shrinks weights.
-		\item \textbf{L1}: $J + \lambda\|w\|_1$ -- promotes sparsity.
-		\item \textbf{Dropout}: randomly zero activations with prob.\ $p$ at train time.
-		\item \textbf{Early stopping}: halt when validation loss rises.
-		\item \textbf{Data augmentation}: synthetic transformations of inputs.
+		\item $P$ unknown $\rightarrow$ expected risk intractable; approximate with the \textbf{empirical} distribution $D_N$ ($N$ training samples).
+		\item Minimising over \emph{all} functions just memorises samples $\rightarrow$ restrict to a parametrised family $f_\theta$. The result depends on the \textbf{training set $D_N$} and the \textbf{model family}.
 	\end{itemize}
-	
+
+	\subsection{Bias--Variance Decomposition}
+
+	\begin{formulabox}
+		\[
+		\underbrace{\mathbb{E}_{D}\!\big[(f_{\hat\theta(D)}(x)-y)^2\big]}_{\text{error}}
+		= \underbrace{\big(\mathbb{E}_{D}[f_{\hat\theta(D)}(x)]-y\big)^2}_{\text{bias}^2}
+		+ \underbrace{\mathrm{Var}_{D}\big[f_{\hat\theta(D)}(x)\big]}_{\text{variance}}
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item Expectation over training sets $D\in\mathcal{D}$, for fixed $(x,y)$ (Geman \& Bienenstock, 1992).
+	\end{itemize}
+
+	\begin{center}
+		\begin{tabular}{p{2.6cm} p{6cm} p{6cm}}
+			\toprule
+			& \textbf{Bias} & \textbf{Variance} \\
+			\midrule
+			Meaning   & Deviation of \emph{average} model from ground truth & Variation of the model across training sets \\
+			Model      & Too simple $\rightarrow$ large bias & Too complex $\rightarrow$ large variance \\
+			In practice (proxy) & training error & test\,$-$\,train error \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+	\noindent\footnotesize More complex model $\Rightarrow$ smaller bias, larger variance. (Polynomial degree $d$: $d$ small $=$ large bias/underfit; $d$ large $=$ large variance/overfit.)\normalsize
+
+	\subsection{Overfitting, Generalisation \& Double Descent}
+
+	\begin{importantbox}
+		\textbf{Overfitting}: the model fits the training set very well but \textbf{fails to generalise} to new data (low train error, high test error). Occurs when: too many parameters (too ``flexible''); training set too small vs.\ input dimension (sampling noise); training set too noisy; high-variance learner.
+		\\[2pt]
+		\textbf{Underfitting}: high bias --- comparably high error on \emph{both} train and test.
+	\end{importantbox}
+
+	\begin{center}
+	\begin{tikzpicture}[>=Stealth, scale=1.0]
+		\draw[->] (0,0)--(6.2,0) node[right, font=\scriptsize] {complexity};
+		\draw[->] (0,0)--(0,4) node[above, font=\scriptsize] {error};
+		\draw[blue, thick, smooth] plot coordinates {(0.3,3.6)(1.5,1.9)(3,0.9)(4.5,0.5)(5.8,0.35)};
+		\node[blue, font=\scriptsize] at (5,0.7) {bias$^2$};
+		\draw[red, thick, smooth] plot coordinates {(0.3,0.3)(1.5,0.5)(3,1.0)(4.5,2.1)(5.8,3.5)};
+		\node[red, font=\scriptsize] at (5,3.0) {variance};
+		\draw[black, very thick, smooth] plot coordinates {(0.3,3.8)(1.5,2.3)(3,1.85)(4.5,2.5)(5.8,3.8)};
+		\node[font=\scriptsize] at (2.6,2.5) {total};
+		\draw[dashed] (3,0)--(3,1.85);
+		\node[font=\scriptsize, below] at (1.2,0) {underfit};
+		\node[font=\scriptsize, below] at (5,0) {overfit};
+	\end{tikzpicture}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Deep double descent} (modern DL): beyond the \emph{interpolation threshold} (model big enough to fit training data exactly), test error can \emph{decrease again} --- ``larger model is better''. So bias and variance can sometimes be reduced \textbf{simultaneously}; the classical bias--variance trade-off is not the whole story for DNNs.
+	\end{importantbox}
+
+	\subsection{Regularisation}
+
+	\begin{definitionbox}
+		\textbf{Regularisation} = methods to reduce the \textbf{variance} error (dependence on the specific training set) $\rightarrow$ better generalisation.
+	\end{definitionbox}
+
+	\begin{center}
+		\begin{tabular}{ll}
+			\toprule
+			Constrain parameters & \textbf{L1 / L2} weight penalty \\
+			Limit training & \textbf{Early stopping} \\
+			Robustness to input variation & \textbf{Data augmentation} \\
+			Modify the model & \textbf{Dropout} \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
+
+	\textbf{Weight penalty} --- add a term that prefers smaller / fewer weights:
+	\begin{formulabox}
+		\[
+		C = C_0 + \lambda\,\Omega(W),\quad (\lambda\ge 0); \qquad
+		\Omega_{L1}=\sum_{l,j,k}|W^{[l]}_{j,k}|, \qquad
+		\Omega_{L2}=\sum_{l,j,k}\big(W^{[l]}_{j,k}\big)^2
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $C_0$: original loss; \quad $\lambda$: regularisation parameter (bigger $\lambda$ $\rightarrow$ more bias, less variance).
+	\end{itemize}
+
+	\textbf{L2 = weight decay} (gradient $\nabla C_0+2\lambda W$):
+	\begin{formulabox}
+		\[
+		W^{(t+1)} = (1-2\alpha\lambda)\,W^{(t)} - \alpha\,\nabla C_0\!\big(W^{(t)}\big)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item The factor $(1-2\alpha\lambda)$ \textbf{shrinks} the weights each step $\rightarrow$ ``weight decay''. (Equivalent to a Gaussian prior on $W$ in a Bayesian view.)
+		\item \textbf{L1} gradient $=\nabla J_0+\lambda\,\mathrm{sign}(W)$ $\rightarrow$ \textbf{sparse} solutions (some weights exactly 0); a.k.a.\ LASSO (Laplacian prior).
+	\end{itemize}
+
+	\subsection{Dropout}
+
+	\begin{definitionbox}
+		\textbf{Dropout}: at each \emph{training} step, each unit in a layer (not output) is dropped (activation masked to 0) with probability $p$ (the dropout rate). At \emph{inference} no units are dropped, but outputs/weights are scaled to compensate.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Default rates}: $\sim$50\% hidden layers, $\sim$20\% input layer.
+		\item \textbf{Why it works}: trains an \textbf{ensemble of sub-networks}; units cannot co-adapt $\rightarrow$ each must be useful on its own $\rightarrow$ more robust, better generalisation.
+		\item Very cheap ($O(n)$), versatile (MLP/CNN/RNN), combinable with other regularisers; reduces effective capacity.
+		\item \textbf{PyTorch}: \texttt{nn.Dropout(p)}; toggle with \texttt{model.train()} / \texttt{model.eval()}.
+	\end{itemize}
+
+	\subsection{Early Stopping}
+
+	\begin{definitionbox}
+		\textbf{Early stopping}: stop training when the \textbf{validation} error stops improving (e.g.\ no improvement for $k$ steps); return the parameters with the smallest validation error.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item Treats \textbf{training time} (\#epochs) as a hyperparameter controlling \textbf{effective capacity} (limits how far $\theta$ moves from its init).
+		\item Equivalent to \textbf{L2} for a linear model with quadratic error; cheap and non-intrusive (Hinton: a ``beautiful free lunch'').
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{Adversarial examples}: a tiny, structured perturbation $+\epsilon$ (looks like noise) flips a confident prediction (panda $\to$ gibbon). Shows NNs are \emph{not} automatically smooth w.r.t.\ inputs $\rightarrow$ motivates \textbf{adversarial training} (train on such examples).
+	\end{importantbox}
+
 	\subsection{Exam Tips}
-	
+
 	\begin{examtipbox}
-		Dropout is only active during training; at test time activations are scaled (or weights scaled by $p$). Increasing $\lambda$ increases bias, reduces variance. Know how to read a train/validation loss curve to diagnose over/underfitting.
+		Likely questions:
+		\begin{itemize}[leftmargin=*]
+			\item \emph{Why can't a single perceptron solve XOR?} --- not linearly separable; need a hidden layer.
+			\item \emph{State / interpret the bias--variance decomposition}; which is under- vs overfitting.
+			\item \emph{Derive the L2 (weight-decay) update} and explain the shrink factor $(1-2\alpha\lambda)$.
+			\item \emph{L1 vs L2} --- L1 gives sparsity (LASSO); L2 shrinks smoothly.
+			\item \emph{How does dropout work / why does it regularise?} --- ensemble, no co-adaptation; train vs eval mode.
+			\item \emph{Why is early stopping regularisation?} --- limits effective capacity ($\approx$ L2).
+		\end{itemize}
+		\textbf{Common mistakes:} leaving dropout on at test time (use \texttt{model.eval()}); thinking larger $\lambda$ reduces bias (it \emph{increases} bias); assuming the bias--variance trade-off always holds (deep double descent); confusing bias (train error) with variance (test\,$-$\,train gap).
 	\end{examtipbox}
 	
 	% ==================================================
 	\section{Convolutional Neural Networks}
 	% ==================================================
 	
-	\subsection{Core Concepts}
-	
+	\subsection{Motivation \& Image Representation}
+
 	\begin{definitionbox}
-		A \textbf{CNN} applies learnable filters (kernels) that slide over the input, exploiting \textbf{local connectivity} and \textbf{parameter sharing} -- ideal for grid-like data (images).
+		An image is just a grid of numbers in $[0,255]$, shape $W\times H\times C$ (e.g.\ $800\times600\times3$ for RGB). A \textbf{CNN} introduces new layer types that \textbf{preserve spatial structure}, detect features \textbf{hierarchically}, and give \textbf{robustness} to image variabilities.
 	\end{definitionbox}
-	
+
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{Filter / kernel}: small weight matrix convolved across the input.
-		\item \textbf{Feature map}: output of one filter.
-		\item \textbf{Stride}: step size of the filter.
-		\item \textbf{Padding}: zeros around the border (\emph{same} vs.\ \emph{valid}).
-		\item \textbf{Receptive field}: input region that influences one output.
+		\item \textbf{Challenges} in image recognition: viewpoint, illumination, deformation, occlusion, background noise, intra-class variability.
+		\item A \textbf{dense (MLP)} layer destroys spatial structure --- you could shuffle all pixels (the same way for every image) and it would perform identically. A one-layer classifier's weights act as per-class \textbf{templates} (high dot product when ``aligned'' with the input).
 	\end{itemize}
-	
-	\subsection{Output Size}
-	
+
+	\begin{importantbox}
+		\textbf{Dot product} measures alignment: $a\cdot b=\lVert a\rVert\lVert b\rVert\cos\theta$. Large positive $=$ aligned, $0$ $=$ orthogonal, large negative $=$ opposite. A filter ``fires'' where its receptive field matches its pattern.
+	\end{importantbox}
+
+	\subsection{The Convolution Layer}
+
+	\begin{definitionbox}
+		A \textbf{filter} (kernel) is a small weight volume $w\times h\times C$ with the \textbf{same depth $C$ as the input}. It \emph{slides} over the input; at each position it computes $w^\top x + b$ (one number). Sliding over all positions produces one \textbf{activation map}. $D$ filters $\rightarrow$ $D$ activation maps $\rightarrow$ output \textbf{volume} of depth $D$.
+	\end{definitionbox}
+
+	\begin{center}
+	\begin{tikzpicture}[node distance=16mm, >=Stealth,
+		v/.style={draw, fill=blue!8, minimum height=12mm, minimum width=12mm, align=center, font=\scriptsize}]
+		\node[v] (in) {Input\\$W\times H\times C$};
+		\node[v, right=28mm of in, fill=green!10, minimum width=14mm] (out) {Output\\$O_W\times O_H\times D$};
+		\draw[->, thick] (in) -- node[above, font=\scriptsize, align=center]{convolve\\$D$ filters\\$w\times h\times C$} (out);
+	\end{tikzpicture}
+	\end{center}
+
+	\textbf{Key properties:}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Receptive field}: the sub-area of the input that influences one output value.
+		\item \textbf{Translation invariance}: the same filter is applied everywhere $\rightarrow$ detects its pattern wherever it appears.
+		\item \textbf{Sparse connectivity}: each output connects only to a local patch (vs.\ fully-connected dense layers).
+		\item \textbf{Parameter sharing}: one filter's weights are reused across all positions $\rightarrow$ far fewer parameters than an MLP.
+		\item Filters are \textbf{learned} (edge / stroke / smoothing detectors emerge from training).
+	\end{itemize}
+
+	\textbf{1D convolution} (lecture convention, indices increasing): given $x=(x_1,\dots,x_W)$ and kernel $u=(u_1,\dots,u_w)$,
 	\begin{formulabox}
 		\[
-		O = \left\lfloor \frac{W - K + 2P}{S} \right\rfloor + 1
+		(x\circledast u)_i = \sum_{j=1}^{w} x_{i-1+j}\,u_j, \qquad \text{output size } = W-w+1
 		\]
-		\small $W$: input size, $K$: kernel, $P$: padding, $S$: stride.
 	\end{formulabox}
-	
-	\subsection{Pooling}
+	\noindent\footnotesize e.g.\ $(1,2,3,4)\circledast(3,2)=(7,12,17)$. (Differs from ``classical'' convolution, which flips the kernel.)\normalsize
+
+	\subsection{Stride, Padding, $1{\times}1$ Convolutions}
+
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{Max pooling}: keeps the strongest activation -- adds invariance.
-		\item \textbf{Average pooling}: averages a region.
-		\item Reduces spatial size, no learnable parameters.
+		\item \textbf{Stride $S$}: step size of the filter. Larger $S$ $\rightarrow$ less overlap, \textbf{smaller} output, less compute. Some strides are incompatible with the input size (framework error).
+		\item \textbf{Padding $P$}: zero frame around the input. Lets the filter reach the border and \textbf{avoids shrinking} maps layer-to-layer. \textbf{Same} output size when $P=\frac{w-1}{2}$ (odd filters, $S{=}1$).
+		\item \textbf{$1{\times}1$ convolution}: filter $1\times1\times C$ mixes \emph{across channels / depth} $\rightarrow$ changes the number of feature maps (depth) without touching spatial size.
+		\item Common settings: $3{\times}3,S{=}1,P{=}1$; \; $5{\times}5,S{=}1,P{=}2$; \; $1{\times}1,S{=}1,P{=}0$; \; $D\in\{32,64,128,512\}$.
 	\end{itemize}
-	
+
+	\subsection{Output Size \& Parameter Count}
+
+	\begin{formulabox}
+		\[
+		O_W = \frac{W - w + 2P_W}{S_w} + 1, \quad
+		O_H = \frac{H - h + 2P_H}{S_h} + 1, \qquad
+		N_{\text{param}} = \underbrace{w\,h\,C\,D}_{\text{weights}} + \underbrace{D}_{\text{bias}}
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $(W,H)$: input size; $(w,h)$: filter size; $P$: padding; $S$: stride; $C$: input channels; $D$: \#filters.
+		\item Example: $5{\times}5{\times}3$ filters, $D{=}6$ $\rightarrow$ $5\cdot5\cdot3\cdot6 + 6 = \mathbf{456}$ parameters --- \textbf{independent of input spatial size}.
+		\item $32{\times}32{\times}3$ input, six $5{\times}5{\times}3$ filters ($S{=}1,P{=}0$) $\rightarrow$ activation maps $28{\times}28{\times}6$.
+	\end{itemize}
+
+	\subsection{Pooling}
+
+	\begin{definitionbox}
+		\textbf{Pooling} reduces the spatial size of each depth slice independently (no learnable parameters), defined by a size and stride. \textbf{Max pooling} keeps the strongest activation in each window.
+	\end{definitionbox}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Rationale}: keep the most significant activations, build a hierarchy, reduce computation, and control overfitting.
+		\item Variants: average pooling, L2-norm pooling. Common settings: $S{=}2,\text{size}{=}2$ (or size 3).
+		\item Example: $224{\times}224{\times}64 \xrightarrow{\text{2×2, S=2}} 112{\times}112{\times}64$ (depth unchanged).
+	\end{itemize}
+
+	\subsection{Other Layers \& Full Architecture}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Dropout}: zero a random set of activations during training $\rightarrow$ robustness, less overfitting.
+		\item \textbf{Dense (FC)}: regular fully-connected layer; equivalent to a conv with $K$ filters spanning the full input. Used at the \textbf{end} to take the class decision.
+	\end{itemize}
+
+	\begin{center}
+	\begin{tikzpicture}[node distance=4mm, >=Stealth,
+		b/.style={draw, rounded corners, minimum height=7mm, font=\scriptsize, align=center, inner sep=2pt}]
+		\node[b, fill=blue!8] (i) {image};
+		\node[b, right=of i, fill=gray!10] (c1) {CONV};
+		\node[b, right=of c1, fill=yellow!20] (r1) {ReLU};
+		\node[b, right=of r1, fill=red!12] (p1) {POOL};
+		\node[b, right=of p1, fill=gray!10] (c2) {CONV};
+		\node[b, right=of c2, fill=yellow!20] (r2) {ReLU};
+		\node[b, right=of r2, fill=red!12] (p2) {POOL};
+		\node[b, right=of p2, fill=green!12] (fc) {FC};
+		\node[b, right=of fc] (y) {class};
+		\draw[->](i)--(c1);\draw[->](c1)--(r1);\draw[->](r1)--(p1);\draw[->](p1)--(c2);
+		\draw[->](c2)--(r2);\draw[->](r2)--(p2);\draw[->](p2)--(fc);\draw[->](fc)--(y);
+	\end{tikzpicture}
+	\end{center}
+	\noindent\footnotesize Typical: stack \texttt{[CONV-RELU-POOL]} (or \texttt{[CONV-RELU-CONV-RELU-POOL]}) blocks, end with FC for classification.\normalsize
+
+	\begin{importantbox}
+		Simple CNNs do \textbf{object recognition} (is the object present?). \textbf{Object detection} (bounding boxes) and \textbf{segmentation} (pixel-level) need modified architectures (e.g.\ YOLO).
+	\end{importantbox}
+
 	\subsection{Transposed Convolutions}
 
 	\begin{definitionbox}
@@ -304,175 +1078,717 @@
 	\subsection{Exam Tips}
 
 	\begin{examtipbox}
-		A conv layer's parameter count is $(K \cdot K \cdot C_{in} + 1)\cdot C_{out}$ -- independent of input spatial size. Be ready to compute feature-map sizes through a stack of layers. Parameter sharing is why CNNs have far fewer weights than an equivalent MLP.
-		\par\smallskip
-		For \textbf{transposed convolutions}, know that they upsample, apply $H_{out}=s(H_{in}-1)+k$, and recognise their use in decoders/GANs. Common trap: calling them a true ``inverse'' of convolution -- they only invert the shape.
+		Likely questions:
+		\begin{itemize}[leftmargin=*]
+			\item \emph{Compute the output size / \#parameters} through a stack of conv/pool layers ($O=\frac{W-w+2P}{S}+1$, $N=whCD+D$). Note params are \textbf{independent of spatial size}.
+			\item \emph{Why CNNs over MLPs for images?} --- preserve spatial structure, sparse connectivity \& parameter sharing $\rightarrow$ far fewer weights, translation invariance.
+			\item \emph{Filter depth \& output depth} --- filter depth $=$ input channels $C$; output depth $=$ \#filters $D$.
+			\item \emph{Role of stride / padding / pooling} --- stride \& pooling downsample; ``same'' padding $P=\frac{w-1}{2}$ keeps size.
+			\item \emph{What does a filter compute?} --- a dot product (template match) over its receptive field.
+		\end{itemize}
+		\textbf{Common mistakes:} forgetting the $+1$ in the output-size formula or the bias term in $N_{\text{param}}$; thinking a filter is 2D (it spans \emph{all} input channels); confusing depth of output (= \#filters) with channels of input. For \textbf{transposed convs}: they upsample ($H_{out}=s(H_{in}-1)+k$) and only invert the \emph{shape}, not a true inverse.
 	\end{examtipbox}
 	
 	% ==================================================
-	\section{Optimizers, Model Tuning, Benefits of Depth}
+	\section{Advanced Optimisers, Model Selection \& Benefits of Depth}
 	% ==================================================
-	
-	\subsection{Optimizers}
+
+	\begin{importantbox}
+		\textbf{Notation (lecture deck).} $C(\theta)$ = cost (template's $J$); $\alpha$ = learning rate (template's $\eta$); $\nabla C$ = gradient; $\beta_1$ = momentum decay; $\beta_2$ = RMS decay; $\odot$ = element-wise product. Optimisers change only the \textbf{parameter-update rule} (the descent direction) -- forward prop and backprop (gradient computation) are untouched.
+	\end{importantbox}
+
+	\subsection{Why Plain Gradient Descent is Weak}
+
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{SGD}: $\theta \leftarrow \theta - \eta g$
-		\item \textbf{Momentum}: accumulate velocity to smooth updates.
-		\item \textbf{RMSProp}: divide by running RMS of gradients.
-		\item \textbf{Adam}: momentum + RMSProp (adaptive per-parameter rates).
+		\item Fixed $\alpha$ assumes a single \textbf{curvature magnitude} and \textbf{isotropy} (same step makes sense in all directions) -- rarely true.
+		\item \textbf{Flat} regions $\rightarrow$ small gradients $\rightarrow$ tiny steps (slow); \textbf{steep} regions $\rightarrow$ large gradients $\rightarrow$ huge steps (overshoot / oscillate).
+		\item \textbf{2nd-order} (Hessian) methods give better local info but are \textbf{infeasible} in DL: parameter space too high-dimensional, too costly.
+		\item Fix: use gradients \emph{smarter} -- keep \textbf{statistics over past gradients} to make better steps. Generic rule: $\theta^{(t+1)} = \theta^{(t)} - G$, where $G$ is the descent step.
 	\end{itemize}
-	
+
+	\subsection{Momentum \& Nesterov}
+
+	\begin{definitionbox}
+		\textbf{Momentum}: move along an \textbf{exponentially decaying moving average} of past gradients. Like a ball rolling downhill picking up speed -- crosses flat regions and saddle points, damps oscillations.
+	\end{definitionbox}
+
 	\begin{formulabox}
-		\textbf{Adam} (bias-corrected):
+		\textbf{PyTorch convention} (note where $\alpha$ sits):
 		\[
-		m_t = \beta_1 m_{t-1} + (1-\beta_1) g_t, \quad
-		v_t = \beta_2 v_{t-1} + (1-\beta_2) g_t^2
+		m^{(t+1)} = \beta_1 m^{(t)} + \nabla C(\theta^{(t)}), \qquad
+		\theta^{(t+1)} = \theta^{(t)} - \alpha\, m^{(t+1)}
+		\]
+		\textbf{Nesterov}: evaluate the gradient at the \emph{look-ahead} point $\theta^{(t)}+\beta_1 m^{(t)}$ (more efficient).
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $\beta_1$: small $\rightarrow$ large friction / fast decay; \textbf{good default $\beta_1=0.9$}. Larger $\beta_1$ $\rightarrow$ larger steps $\rightarrow$ faster but more overshoot/oscillation.
+		\item For a constant gradient $v$: $m \approx (1-\beta_1)^{-1} v$ -- the effective gradient is \textbf{magnified} by $(1-\beta_1)^{-1}$ (e.g.\ $10\times$ at $0.9$) $\rightarrow$ choose a \emph{smaller} learning rate.
+		\item PyTorch: \texttt{torch.optim.SGD(params, lr, momentum=0.9, nesterov=True)} -- same optimiser as plain SGD.
+	\end{itemize}
+
+	\subsection{RMSProp}
+
+	\begin{definitionbox}
+		\textbf{RMSProp}: adapt the learning rate \textbf{per component}. Divide each gradient component by its typical scale (RMS of recent values) $\rightarrow$ \textbf{homogenise} learning speed across directions: speed up where gradients are small, slow down where large.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\[
+		s^{(t+1)} = \beta_2\, s^{(t)} + (1-\beta_2)\,\nabla C(\theta^{(t)}) \odot \nabla C(\theta^{(t)})
 		\]
 		\[
-		\hat m_t = \frac{m_t}{1-\beta_1^t}, \;\;
-		\hat v_t = \frac{v_t}{1-\beta_2^t}, \;\;
-		\theta_{t+1} = \theta_t - \eta \frac{\hat m_t}{\sqrt{\hat v_t}+\epsilon}
+		\theta^{(t+1)} = \theta^{(t)} - \frac{\alpha}{\sqrt{s^{(t+1)}+\epsilon}} \odot \nabla C(\theta^{(t)})
 		\]
 	\end{formulabox}
-	
-	\subsection{Model Tuning}
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{Learning-rate schedules}: step decay, cosine, warmup.
-		\item \textbf{Hyperparameter search}: grid, random, Bayesian.
-		\item \textbf{Tune on the validation set}, never the test set.
+		\item $s$: moving average of \textbf{squared} gradient components; $\beta_2$ controls its memory. \textbf{Good default $\beta_2=0.99$}; $\epsilon$ avoids division by zero.
+		\item Operations are \textbf{element-wise}. The directional rescaling holds even at $\beta_2=0$.
+		\item PyTorch: \texttt{RMSprop(params, lr, alpha=0.99)} -- here $\beta_2$ is called \texttt{alpha}.
 	\end{itemize}
-	
-	\subsection{Benefits of Depth}
-	
+
+	\subsection{Adam (state of the art)}
+
+	\begin{definitionbox}
+		\textbf{Adam} = \textbf{Momentum} (1st moment $m$) $+$ \textbf{RMSProp} (2nd moment $s$), with \textbf{bias correction}. The de-facto default optimiser.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\[
+		m^{(t+1)} = \beta_1 m^{(t)} + (1-\beta_1)\nabla C, \qquad
+		s^{(t+1)} = \beta_2 s^{(t)} + (1-\beta_2)\,\nabla C \odot \nabla C
+		\]
+		\[
+		\hat m = \frac{m^{(t+1)}}{1-\beta_1^{\,t+1}}, \quad
+		\hat s = \frac{s^{(t+1)}}{1-\beta_2^{\,t+1}}, \quad
+		\theta^{(t+1)} = \theta^{(t)} - \alpha\,\frac{\hat m}{\sqrt{\hat s}+\epsilon}
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Bias correction} $1-\beta^{\,t+1}$: $m,s$ start at $0$, so early steps would be biased toward $0$; dividing up-weights the current gradient at the start.
+		\item Defaults: $\alpha=0.001$, $\beta_1=0.9$ (momentum), $\beta_2=0.999$ (RMS decay), $\epsilon=10^{-8}$.
+	\end{itemize}
+
 	\begin{importantbox}
-		Deep networks can represent certain functions \emph{exponentially} more compactly than shallow ones. Depth builds a hierarchy of features (edges $\to$ textures $\to$ parts $\to$ objects).
+		Adam best \emph{minimises training cost / raises accuracy fastest}, but does \textbf{not} guarantee better \textbf{generalisation} -- a too-performant optimiser can \textbf{overfit}. SGD shows more fluctuations (no smoothing of the update).
 	\end{importantbox}
-	
-	\subsection{Exam Tips}
-	
+
+	\subsection{Learning-Rate Schedules}
+
+	\begin{itemize}[leftmargin=*]
+		\item Adjust $\alpha$ by a \textbf{predefined rule of the epoch} (not from optimisation statistics like Adam). Typically: start \textbf{high}, then reduce.
+		\item \textbf{Piecewise constant} (step): drop $\alpha$ at fixed epoch boundaries -- \texttt{StepLR}.
+		\item \textbf{Exponential}: $\alpha^{(t+1)} = \gamma\,\alpha^{(t)} = \gamma^{\,t+1}\alpha^{(0)}$ -- \texttt{ExponentialLR}.
+		\item PyTorch: call \texttt{scheduler.step()} once per epoch after \texttt{optimizer.step()}; see \texttt{torch.optim.lr\_scheduler}.
+	\end{itemize}
+
+	\subsection{Model Selection: Train / Validate / Test}
+
+	\begin{definitionbox}
+		Split \textbf{trustable} data (same distribution, large enough) into \textbf{3 disjoint} sets.
+	\end{definitionbox}
+
+	\begin{center}
+	\begin{tabular}{@{}llcc@{}}
+		\toprule
+		\textbf{Set} & \textbf{Used for} & \textbf{small} & \textbf{large} \\
+		\midrule
+		Training   & fit model parameters                 & 60\% & 98\% \\
+		Validation & select model, tune hyper-parameters  & 20\% & 1\%  \\
+		Test       & measure final performance \emph{once}& 20\% & 1\%  \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+	\begin{itemize}[leftmargin=*]
+		\item Tune on \textbf{validation}, never on test. Large datasets need a smaller \% for val/test (still many samples).
+		\item Famous benchmarks (ImageNet, MNIST): repeated comparison risks \textbf{overfitting on the test set} across publications.
+	\end{itemize}
+
+	\begin{definitionbox}
+		\textbf{Hyper-parameters} specify model/training properties \textbf{not} trained by gradient descent; tuned on the validation set. Examples: learning rate, batch size, \#layers, \#neurons, \#filters / filter size / stride / padding, regularisation strength, dropout rate.
+	\end{definitionbox}
+
+	\subsection{Tuning Workflow \& Criteria}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Check initial loss} matches the init strategy (e.g.\ $-\ln(1/K)$ for $K$-class softmax).
+		\item \textbf{Overfit a single batch} $\rightarrow$ should reach a perfect fit (sanity check the model can learn).
+		\item Train on full set: find an $\alpha$ that makes loss go down; consider LR decay.
+		\item Tune on a \textbf{coarse grid}, few epochs $\rightarrow$ \textbf{refine}, train longer $\rightarrow$ always watch loss curves and iterate.
+		\item Judge \textbf{overfitting} by comparing train vs.\ validation loss/metrics; compare to human-level performance; mind \textbf{fluctuations / error bars}.
+	\end{itemize}
+
+	\begin{definitionbox}
+		\textbf{$k$-fold cross-validation}: rotate which fold is validation ($k$ fits). Average $=$ better error estimate; \textbf{spread} across folds $\approx$ confidence interval. \textbf{Costly} ($k\times$ training). \texttt{sklearn.model\_selection.KFold}.
+	\end{definitionbox}
+
+	\textbf{Search strategies:}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Grid search}: sweep a manual grid -- expensive, wastes evaluations on unimportant dims.
+		\item \textbf{Random search}: sample ranges -- explores more distinct values per hyper-parameter (better when few params matter).
+		\item \textbf{Bayesian optimisation}: model performance as a Gaussian process, pick next point by expected improvement (exploration vs.\ exploitation).
+		\item \textbf{AutoML / NAS}: search over architectures (RL, genetic algorithms).
+		\item \textbf{Monitoring}: Weights \& Biases (W\&B), TensorBoard -- track loss/metrics, run sweeps (MLOps).
+	\end{itemize}
+
+	\subsection{Performance Measures: Confusion Matrix}
+
+	\begin{definitionbox}
+		The \textbf{confusion matrix} $C$ of an $n$-class classifier is the $n\times n$ matrix with
+		\[
+		C_{ij} = \#\{\text{test samples of \textbf{actual} class } i \text{ \textbf{predicted} as class } j\}.
+		\]
+		Rows $=$ actual ($i$), columns $=$ predicted ($j$). A \textbf{perfect} classifier is purely diagonal.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item Shows \emph{which class is confused with what} and whether errors are ``understandable'' -- a basis for error analysis (not just a single score).
+		\item \texttt{from sklearn.metrics import confusion\_matrix; cm = confusion\_matrix(Y, Ypred)}.
+	\end{itemize}
+
+	\textbf{Per-class one-vs-rest counts} (row sum $N_i$, column sum $\hat N_i$):
+	\begin{formulabox}
+		\[
+		N_i = \sum_j C_{ij}\ \text{(actual class }i\text{)}, \qquad
+		\hat N_i = \sum_j C_{ji}\ \text{(predicted class }i\text{)}
+		\]
+		\[
+		\mathrm{TP}=C_{ii},\quad
+		\mathrm{FN}=N_i-C_{ii},\quad
+		\mathrm{FP}=\hat N_i-C_{ii},\quad
+		\mathrm{TN}=N-(N_i+\hat N_i-C_{ii})
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $\mathrm{TP}$: diagonal; $\mathrm{FN}$: rest of \emph{row} $i$; $\mathrm{FP}$: rest of \emph{column} $i$; $\mathrm{TN}$: everything else.
+	\end{itemize}
+
+	\textbf{Metrics from $C$} ($N$ samples, $K$ classes):
+	\begin{formulabox}
+		\[
+		\mathrm{acc} = \frac{1}{N}\sum_{i=1}^{K} C_{ii}\ \text{(sum of diagonal)}, \qquad
+		\mathrm{err} = 1-\mathrm{acc}
+		\]
+		\[
+		\mathrm{prec}_i = \frac{C_{ii}}{\hat N_i}, \qquad
+		\mathrm{recall}_i = \frac{C_{ii}}{N_i}, \qquad
+		F_1^{(i)} = 2\,\frac{\mathrm{prec}_i\cdot\mathrm{recall}_i}{\mathrm{prec}_i+\mathrm{recall}_i}
+		\]
+		\[
+		\mathrm{prec}=\tfrac{1}{K}\textstyle\sum_i \mathrm{prec}_i,\quad
+		\mathrm{recall}=\tfrac{1}{K}\textstyle\sum_i \mathrm{recall}_i,\quad
+		F_1^{\text{macro}}=\tfrac{1}{K}\textstyle\sum_i F_1^{(i)}
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Precision} (column-normalised): of those \emph{predicted} $i$, how many are correct -- penalises \textbf{false positives}.
+		\item \textbf{Recall} (row-normalised): of the \emph{actual} $i$, how many are found -- penalises \textbf{false negatives}.
+		\item \textbf{$F_1$}: harmonic mean of precision \& recall (low if either is low). \textbf{Macro} variants average the per-class scores equally.
+		\item Class error $\mathrm{err}_i = \dfrac{\mathrm{FN}+\mathrm{FP}}{N} = \dfrac{(N_i-C_{ii})+(\hat N_i-C_{ii})}{N}$, \; $\mathrm{acc}_i = 1-\mathrm{err}_i$.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{System accuracy $\ne$ average class accuracy}, and macro precision/recall need \emph{not} equal system accuracy -- they weight classes, not samples. With imbalanced classes, accuracy can be high while a rare class is mostly missed (look at per-class recall / $F_1$).
+	\end{importantbox}
+
 	\begin{examtipbox}
-		Adam defaults: $\beta_1=0.9$, $\beta_2=0.999$, $\epsilon=10^{-8}$. Adam converges fast but SGD+momentum often generalizes better. Random search beats grid search when only a few hyperparameters matter.
+		Likely questions:
+		\begin{itemize}[leftmargin=*]
+			\item \emph{Given a confusion matrix, compute} accuracy, per-class precision/recall/$F_1$. Remember: precision $=$ down the \textbf{column} ($\hat N_i$), recall $=$ across the \textbf{row} ($N_i$).
+			\item \emph{Read off confusions}: large off-diagonal $C_{ij}$ $=$ class $i$ mistaken for $j$ (e.g.\ MNIST 4$\to$9, 5$\to$3).
+			\item \emph{Precision vs.\ recall trade-off} and why $F_1$ (harmonic mean) is used; when accuracy misleads (class imbalance).
+		\end{itemize}
+		\textbf{Common mistakes:} swapping rows/columns (actual vs.\ predicted) $\rightarrow$ precision$\leftrightarrow$recall swapped; using the arithmetic instead of \textbf{harmonic} mean for $F_1$; assuming system accuracy equals the mean of class accuracies.
 	\end{examtipbox}
-	
+
+	\subsection{Universal Approximation Theorem}
+
+	\begin{definitionbox}
+		A feedforward network with \textbf{one linear output layer} and \textbf{at least one hidden layer} with a \textbf{non-linear} activation (sigmoid, ReLU, \dots) can approximate any continuous function $h:\mathbb{R}^n\to\mathbb{R}^m$ on compact support to \textbf{arbitrary accuracy} -- given \textbf{enough hidden units} and suitable parameters. (Cybenko 1989; Hornik 1991.)
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Non-linearity is crucial} -- stacked linear layers collapse to one linear map.
+		\item \emph{Constructive idea}: a sigmoid pair builds a 1D indicator/bump $\phi_{[a,b]}(x)=\sigma(s(x-a))-\sigma(s(x-b))$; linear combinations of bumps build arbitrary step functions; in $n$D, sum coordinate stripes and threshold.
+		\item \textbf{Caveat}: ``shallow but wide'' may need an \textbf{exponential} number of neurons $\rightarrow$ motivates \textbf{depth}.
+	\end{itemize}
+
+	\subsection{Curse of Dimensionality}
+
+	\begin{definitionbox}
+		\textbf{Curse of dimensionality}: as input dimension $d$ grows, the volume grows so fast that data become \textbf{sparse}. The bucket/indicator approach needs \textbf{$b^d$ buckets} and exponentially many samples to keep each populated.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		Density per block for fixed dataset size $m$, with $b$ bins per axis:
+		\[
+		\rho = \frac{m}{b^{\,d}} \propto b^{-d} \;\;\text{(decays fast)}, \qquad
+		\text{constant density} \Rightarrow m = \rho\, b^{\,d}\;\text{(grows exponentially)}
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item Typical DL inputs are huge: MNIST $784$, CIFAR-10 $3072$, ImageNet $\geq196{,}608$ dims $\rightarrow$ classical (kernel/$k$NN, local-smoothness) methods \textbf{infeasible}.
+		\item \textbf{Manifold hypothesis}: real data (cats, digits) occupy a tiny, lower-dimensional \textbf{manifold} of the raw space (pure noise is essentially never sampled). Local smoothness may hold \emph{on} the manifold, not in raw space.
+		\item DL learns \textbf{embeddings / latent representations} on that manifold (filter noise, keep task-relevant variation) -- often via \textbf{unsupervised / self-supervised} learning $\rightarrow$ mitigates the curse.
+	\end{itemize}
+
+	\subsection{Benefits of Depth}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Hierarchy of concepts}: successive layers represent features of increasing abstraction (pixels $\to$ edges $\to$ corners/contours $\to$ parts $\to$ objects). Observed in CNN weights (not MLPs).
+		\item \textbf{Compositional generalisation}: represent all \emph{combinations} of features without training examples for each combination (e.g.\ CNN translation invariance) $\rightarrow$ better generalisation.
+		\item \textbf{Nested structures} scale $\sim\log(n)$: a binary tree (deep) computes $n$-input logic with far fewer units than a shallow net (which needs exponentially more). Cf.\ Huffman coding, FFT.
+		\item \textbf{Catch}: deep nets are harder to train $\rightarrow$ need better optimisers (avoid getting stuck) and methods to \textbf{avoid vanishing gradients} (batchnorm, careful init -- later weeks).
+	\end{itemize}
+
+	\subsection{Exam Tips}
+
+	\begin{examtipbox}
+		Likely questions:
+		\begin{itemize}[leftmargin=*]
+			\item \emph{Why plain GD struggles} -- fixed $\alpha$ assumes uniform/isotropic curvature; flat $\rightarrow$ slow, steep $\rightarrow$ overshoot.
+			\item \emph{Compare Momentum / RMSProp / Adam} -- momentum = avg of \emph{gradients} (direction); RMSProp = scale by avg of \emph{squared} gradients (per-axis rate); Adam = both $+$ bias correction. Give defaults ($\beta_1{=}0.9$, $\beta_2{=}0.999$/$0.99$).
+			\item \emph{Write the Adam / RMSProp update} (derive-ish) -- watch $\odot$, the $\sqrt{\cdot}+\epsilon$, and bias correction $1-\beta^{\,t}$.
+			\item \emph{State the Universal Approximation Theorem} and why non-linearity / depth still matter.
+			\item \emph{Explain the curse of dimensionality} ($\rho\propto b^{-d}$) and the manifold hypothesis as DL's answer.
+			\item \emph{Why go deeper?} -- hierarchy of features, exponential compactness, better generalisation.
+		\end{itemize}
+		\textbf{Common mistakes:} confusing $\beta_1$ (momentum) with $\beta_2$ (RMS); forgetting bias correction in Adam; saying optimisers change backprop (they only change the \emph{update}); claiming Adam always generalises best (it overfits more readily than SGD+momentum); tuning on the \emph{test} set instead of validation.
+	\end{examtipbox}
 	% ==================================================
 	\section{Backpropagation}
 	% ==================================================
-	
-	\subsection{Core Concepts}
-	
+
+	\begin{importantbox}
+		\textbf{Notation (deck).} Layer $l$: $a^{[l]}$ activations (with $a^{[0]}=x$, $a^{[L]}=\hat y$), $z^{[l]}$ pre-activation, $W^{[l]}$ weights, $b^{[l]}$ bias, $g$ activation, $L$ loss, $J_f$ Jacobian of $f$, $\odot$ element-wise product. \emph{Optimisers} (week 5) only change the update step; \emph{backprop} computes the gradient that feeds it.
+	\end{importantbox}
+
+	\subsection{Forward Pass}
+
 	\begin{definitionbox}
-		\textbf{Backpropagation} computes the gradient of the loss w.r.t.\ every parameter by applying the \textbf{chain rule} backward through the computational graph -- one efficient backward pass reuses intermediate values.
+		The \textbf{forward pass} feeds $x$ through the layers; each layer applies an \textbf{affine transform} then an \textbf{element-wise non-linearity}. Stacking layers $=$ \textbf{nested function calls}.
 	\end{definitionbox}
-	
+
 	\begin{formulabox}
-		\textbf{Chain rule:}
+		Per layer (row-vector / PyTorch convention):
 		\[
-		\frac{\partial \mathcal{L}}{\partial \theta}
-		= \frac{\partial \mathcal{L}}{\partial a}\,
-		\frac{\partial a}{\partial z}\,
-		\frac{\partial z}{\partial \theta}
+		z^{[l]} = a^{[l-1]}\big(W^{[l]}\big)^{\!\top} + b^{[l]}, \qquad a^{[l]} = g\big(z^{[l]}\big)
+		\]
+		Two layers nested: $a^{[2]} = g\!\Big(a^{[1]}\big(W^{[2]}\big)^{\!\top}+b^{[2]}\Big)$, \; $a^{[1]} = g\!\Big(a^{[0]}\big(W^{[1]}\big)^{\!\top}+b^{[1]}\Big)$.
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item Inputs/outputs of each layer are \textbf{tensors}; layer ops are tensor ops $\rightarrow$ a \textbf{computational graph}.
+		\item PyTorch \texttt{Linear} $=$ affine only; activation is a separate module (\texttt{ReLU}, \texttt{Softmax}). Keras \texttt{Dense} bundles both.
+	\end{itemize}
+
+	\subsection{Chain Rule}
+
+	\begin{definitionbox}
+		\textbf{Chain rule}: the sensitivity of a nested function w.r.t.\ an inner variable is the \textbf{product} of the sensitivities of the composing factors. In a DL model $L$ is a deeply nested function of the parameters $\rightarrow$ derivatives via repeated chain rule.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\textbf{Single variable} ($f,g:\mathbb{R}\to\mathbb{R}$):
+		\[
+		\frac{\partial}{\partial x} f(g(x)) = \frac{\partial f}{\partial g}\cdot\frac{\partial g}{\partial x}
+		\]
+		\textbf{Multi-variable} ($g:\mathbb{R}^n\!\to\mathbb{R}^m$, $f:\mathbb{R}^m\!\to\mathbb{R}^l$): product of \textbf{Jacobians}
+		\[
+		J_{f\circ g}(x) = J_f(g(x))\cdot J_g(x), \qquad
+		\big(J_g\big)_{ij} = \frac{\partial g_i}{\partial x_j}
 		\]
 	\end{formulabox}
-	
-	\subsection{Forward \& Backward Pass}
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{Forward}: compute layer outputs and the loss, cache activations.
-		\item \textbf{Backward}: propagate the error signal $\delta$ from output to input.
-		\item Per layer: $\delta^{(l)} = (W^{(l+1)\top}\delta^{(l+1)}) \odot \sigma'(z^{(l)})$.
-		\item Gradients: $\nabla_{W^{(l)}} = \delta^{(l)} (h^{(l-1)})^\top$, \;\; $\nabla_{b^{(l)}} = \delta^{(l)}$.
+		\item \textbf{Branching} (variable feeds several factors) $\rightarrow$ \textbf{sum} the path contributions: $\frac{\partial L}{\partial x}=\sum_k \frac{\partial L}{\partial f_k}\frac{\partial f_k}{\partial x}$.
 	\end{itemize}
-	
+
+	\subsection{Computational Graph: Local \& Accumulated Gradients}
+
+	\begin{importantbox}
+		Each node has a \textbf{local gradient} (derivative of its output w.r.t.\ its input). Backprop sweeps from the loss backward, multiplying the incoming \textbf{accumulated gradient} by the local gradient, passing the result upstream.
+	\end{importantbox}
+
+	\begin{center}
+	\begin{tikzpicture}[node distance=20mm, >=Stealth,
+		op/.style={draw, circle, fill=green!12, minimum size=10mm, font=\small}]
+		\node[op] (g) {$g$};
+		\node[op, right=of g] (f) {$f$};
+		\node[op, right=of f] (h) {$h$};
+		\node[left=14mm of g] (x) {$x{=}a^{[0]}$};
+		\node[right=14mm of h] (L) {$L$};
+		\draw[->, thick] (x) -- (g);
+		\draw[->, thick] (g) -- node[above, font=\scriptsize]{$a^{[1]}$} (f);
+		\draw[->, thick] (f) -- node[above, font=\scriptsize]{$a^{[2]}$} (h);
+		\draw[->, thick] (h) -- (L);
+		\draw[->, teal, dashed, bend left=38] (h) to node[below, font=\scriptsize]{$J_h$} (f);
+		\draw[->, teal, dashed, bend left=38] (f) to node[below, font=\scriptsize]{$J_h J_f$} (g);
+		\draw[->, teal, dashed, bend left=38] (g) to node[below, font=\scriptsize]{$J_h J_f J_g$} (x);
+	\end{tikzpicture}
+	\end{center}
+	\[
+	\frac{\partial h}{\partial a^{[0]}} = \underbrace{\frac{\partial h}{\partial a^{[2]}}}_{\text{accum.}}\cdot \frac{\partial f}{\partial a^{[1]}}\cdot \frac{\partial g}{\partial a^{[0]}} \qquad(\text{forward} \rightarrow,\;\; \text{backward} \leftarrow)
+	\]
+
+	\subsection{Backprop: the Algorithm}
+
+	\begin{definitionbox}
+		\textbf{Back-propagation} (Rumelhart 1986; Werbos 1975): an efficient scheme to compute $\nabla_\theta L$. Starting from the back, it passes through every layer, \textbf{accumulating local gradients}, and on the fly computes the derivatives w.r.t.\ each layer's $W,b$ using the accumulated derivative.
+	\end{definitionbox}
+
+	\textbf{Linear layer} $z^{[l]} = a^{[l-1]}(W^{[l]})^{\top}+b^{[l]} = f(a^{[l-1]};W^{[l]},b^{[l]})$, given incoming $\frac{\partial L}{\partial z^{[l]}}$:
+	\begin{formulabox}
+		\[
+		\frac{\partial L}{\partial W^{[l]}} = \frac{\partial L}{\partial z^{[l]}}\frac{\partial f}{\partial W^{[l]}}, \quad
+		\frac{\partial L}{\partial b^{[l]}} = \frac{\partial L}{\partial z^{[l]}}\frac{\partial f}{\partial b^{[l]}}, \quad
+		\frac{\partial L}{\partial a^{[l-1]}} = \frac{\partial L}{\partial z^{[l]}}\frac{\partial f}{\partial a^{[l-1]}}
+		\]
+		Local gradients: $\dfrac{\partial f_j}{\partial b_k}=\delta_{jk}$, \quad $\dfrac{\partial f_j}{\partial W_{ki}}=\delta_{jk}\,a_i^{[l-1]}$, \quad $\dfrac{\partial f_j}{\partial a_k^{[l-1]}}=W_{jk}^{[l]}$.
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item The accumulated gradient $\frac{\partial L}{\partial z^{[l]}}$ is \textbf{reused} for (1) the parameters $W^{[l]},b^{[l]}$ and (2) the upstream activations $a^{[l-1]}$ (passed to the previous layer).
+	\end{itemize}
+
+	\textbf{Activation layer} $a^{[l]} = g(z^{[l]})$ (element-wise):
+	\begin{formulabox}
+		\[
+		\frac{\partial L}{\partial z^{[l]}} = \frac{\partial L}{\partial a^{[l]}} \odot g'\!\big(z^{[l]}\big)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item Every layer type (CNN, RNN/\,backprop-through-time, BatchNorm, Transformer, softmax\ldots) has its own local gradient; the accumulation scheme is identical.
+		\item \textbf{Rule of thumb}: the backward pass costs $\approx 2\times$ the forward pass.
+	\end{itemize}
+
+	\subsection{Autograd \& Computational Graphs (PyTorch)}
+
+	\begin{definitionbox}
+		Frameworks build a \textbf{DAG} (directed acyclic graph): \textbf{nodes} $=$ tensor operators (each knows its local-gradient function \texttt{grad\_fn}), \textbf{edges} $=$ tensors. \textbf{Autograd} walks this DAG backward to compute all gradients.
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \texttt{requires\_grad=True} marks a tensor to be tracked; the DAG is built \textbf{on the fly}. NN-layer parameters get it automatically.
+		\item \texttt{loss.backward()} starts accumulation at the root; gradients land in \texttt{.grad} of the \textbf{leaf} nodes (intermediate \texttt{.grad} are freed unless \texttt{retain\_grad()}).
+		\item \texttt{.grad} $=$ accumulated gradient; \texttt{.grad\_fn} $=$ local-gradient function; \texttt{next\_functions} link a node to its inputs' \texttt{grad\_fn}.
+		\item \texttt{optimizer.zero\_grad()} \textbf{before} each \texttt{backward()} -- grads \textbf{accumulate} (add up) otherwise. (This same accumulation lets you split a mini-batch that doesn't fit in memory.)
+		\item \texttt{backward()} works \textbf{once} per graph (else \texttt{RuntimeError}; use \texttt{retain\_graph=True}).
+		\item \texttt{torch.no\_grad()}: context that switches off tracking (parameter updates, evaluation). \texttt{x.detach()}: a tensor sharing data but cut from the graph (no gradient beyond it).
+	\end{itemize}
+
+	\begin{center}
+	\begin{tikzpicture}[node distance=7mm, >=Stealth,
+		t/.style={draw, fill=cyan!12, minimum height=6mm, font=\scriptsize, inner sep=2pt},
+		o/.style={draw, fill=gray!15, font=\scriptsize, inner sep=2pt}]
+		\node[t] (W) {W};
+		\node[o, below=of W] (ag1) {AccumulateGrad};
+		\node[t, right=14mm of W] (b) {b};
+		\node[o, below=of ag1] (mul) {MulBackward};
+		\node[o, below=of b] (ag2) {AccumulateGrad};
+		\node[o, below=8mm of mul] (add) {AddBackward};
+		\node[o, below=of add] (sig) {SigmoidBackward};
+		\node[draw, fill=green!15, below=of sig, font=\scriptsize, inner sep=2pt] (a) {a};
+		\draw[->](W)--(ag1); \draw[->](ag1)--(mul); \draw[->](b)--(ag2);
+		\draw[->](mul)--(add); \draw[->](ag2)--(add); \draw[->](add)--(sig); \draw[->](sig)--(a);
+		\node[right=10mm of add, font=\scriptsize, align=left] {\texttt{backward()}\\ direction $\uparrow$};
+	\end{tikzpicture}
+	\end{center}
+	\noindent\footnotesize DAG for $a=\sigma(xW^{\top}+b)$: leaves $W,b$ accumulate grads; backward sweeps bottom-up.\normalsize
+
 	\subsection{Exam Tips}
-	
+
 	\begin{examtipbox}
-		The forward pass must cache activations because they are reused in the backward pass. A common exam task: hand-compute gradients for a tiny 2-layer network. Watch the derivative of the activation: $\sigma'(z)=\sigma(z)(1-\sigma(z))$, ReLU$'=\mathbb{1}[z>0]$.
+		Likely questions:
+		\begin{itemize}[leftmargin=*]
+			\item \emph{Derive backprop} for a tiny 2-layer net by hand -- forward (cache activations), then backward applying $\frac{\partial L}{\partial z^{[l]}}=\frac{\partial L}{\partial a^{[l]}}\odot g'(z^{[l]})$ and the linear-layer rules. Examiners love ``\emph{derive}'' here (vs.\ ``apply'' for gradient descent).
+			\item \emph{State the chain rule} (single- \& multi-variable / Jacobian product) and why a branching variable \textbf{sums} its paths.
+			\item \emph{What does backprop reuse / why is it efficient?} -- accumulated gradients shared across a layer's params and its input; one backward pass, $\approx 2\times$ forward cost.
+			\item \emph{Explain autograd}: DAG built on the fly, \texttt{requires\_grad}, \texttt{grad\_fn} (local) vs.\ \texttt{.grad} (accumulated), leaf nodes.
+			\item \emph{Why \texttt{zero\_grad()} each step?} -- gradients accumulate by default.
+		\end{itemize}
+		\textbf{Common mistakes:} forgetting to cache activations (needed in backward); dropping the activation derivative $g'(z)$; sign/transpose slips in $\frac{\partial L}{\partial a^{[l-1]}}=\frac{\partial L}{\partial z^{[l]}}W^{[l]}$; forgetting \texttt{zero\_grad()} (grads pile up); calling \texttt{backward()} twice without \texttt{retain\_graph}; thinking optimisers do the differentiation (backprop does). Activation derivatives: $\sigma'(z)=\sigma(z)(1-\sigma(z))$, $\mathrm{ReLU}'=\mathbb{1}[z>0]$.
 	\end{examtipbox}
-	
 	% ==================================================
 	\section{CNNs Part 2 -- Data Augmentation -- Deep Architectures}
 	% ==================================================
-	
-	\subsection{Data Augmentation}
-	
+
+	\subsection{CNNs Learn the Feature Extraction}
+
 	\begin{definitionbox}
-		Artificially enlarging the training set with label-preserving transformations to improve generalization and act as regularization.
+		A CNN's filter weights are \textbf{learned by training} -- the system learns \emph{both} to extract features and to classify (vs.\ classical ML where features are hand-engineered before a separate model). Composing conv layers yields a \textbf{hierarchy of features}.
 	\end{definitionbox}
-	
+
 	\begin{itemize}[leftmargin=*]
-		\item Geometric: flip, rotate, crop, scale, translate.
-		\item Photometric: brightness, contrast, color jitter, noise.
-		\item Advanced: Cutout, Mixup, CutMix, RandAugment.
+		\item \textbf{Early} layers $\rightarrow$ low-level features (edges, colours, textures); \textbf{late} layers $\rightarrow$ high-level features (parts, objects).
+		\item Going deeper: \#filters \textbf{grows}, activation maps \textbf{shrink} (pooling) $\rightarrow$ more abstract, smaller-resolution representations.
 	\end{itemize}
-	
-	\subsection{Classic Architectures}
-	\begin{center}
-		\begin{tabular}{lll}
+
+	\begin{examtipbox}
+		\textbf{Worked output-size / param count} (Keras FashionMNIST CNN, input $28{\times}28{\times}1$). Recall $O=\frac{W-w+2P}{S}+1$, \;$N_{\text{param}}=w\,h\,C\,D+D$.
+		\begin{center}\footnotesize
+		\begin{tabular}{@{}lll@{}}
 			\toprule
-			Model & Key idea & Year \\
+			Layer & Output shape & \#params \\
 			\midrule
-			LeNet-5 & First successful CNN (digits) & 1998 \\
-			AlexNet & ReLU + dropout + GPUs & 2012 \\
-			VGG & Deep stacks of $3\times3$ convs & 2014 \\
-			GoogLeNet & Inception modules & 2014 \\
-			ResNet & Residual / skip connections & 2015 \\
+			Conv2D(32, $3{\times}3$, same) & $28{\times}28{\times}32$ & $3{\cdot}3{\cdot}1{\cdot}32+32=\mathbf{320}$ \\
+			ReLU & $28{\times}28{\times}32$ & 0 \\
+			MaxPool $2{\times}2$ & $14{\times}14{\times}32$ & 0 \\
+			Flatten & $6272$ & 0 \\
+			Dense(128) & $128$ & $6272{\cdot}128+128=\mathbf{802\,944}$ \\
+			Dense(10) softmax & $10$ & $128{\cdot}10+10=\mathbf{1290}$ \\
 			\bottomrule
 		\end{tabular}
-	\end{center}
-	
-	\subsection{Residual Connections}
-	
-	\begin{formulabox}
-		\[
-		y = \mathcal{F}(x, \{W_i\}) + x
-		\]
-	\end{formulabox}
-	
-	\begin{importantbox}
-		Skip connections let gradients flow directly, enabling very deep networks (100+ layers) by mitigating vanishing gradients. The network only needs to learn the \emph{residual}.
-	\end{importantbox}
-	
-	\subsection{Exam Tips}
-	
-	\begin{examtipbox}
-		$3\times3$ convs stacked give the same receptive field as one large conv but with fewer parameters and more non-linearity (VGG insight). ResNet's identity shortcut is why depth stopped hurting accuracy.
+		\end{center}
+		Note: pooling/activation have \textbf{0} params; \textbf{FC layers dominate} the parameter count (here the flatten$\to$Dense).
 	\end{examtipbox}
-	
-	% ==================================================
-	\section{Efficient Learning of DNNs}
-	% ==================================================
-	
-	\subsection{Vanishing \& Exploding Gradients}
-	
-	\begin{importantbox}
-		In deep nets, repeated multiplication of small (or large) Jacobians causes gradients to vanish (or explode), stalling or destabilizing training. Saturating activations (sigmoid/tanh) worsen vanishing gradients.
-	\end{importantbox}
-	
-	\subsection{Weight Initialization}
+
+	\subsection{Visualising What a CNN Learned}
+
 	\begin{itemize}[leftmargin=*]
-		\item \textbf{Xavier/Glorot} (tanh/sigmoid): $\mathrm{Var}(w)=\frac{2}{n_{in}+n_{out}}$
-		\item \textbf{He} (ReLU): $\mathrm{Var}(w)=\frac{2}{n_{in}}$
+		\item \textbf{Activation maps}: forward an image, plot a chosen layer/filter's output (build a sub-model input$\rightarrow$that layer). Shows what each filter responds to.
+		\item \textbf{Input that maximises an activation} (gradient \textbf{ascent} on the image):
 	\end{itemize}
-	
-	\subsection{Batch Normalization}
-	
-	\begin{definitionbox}
-		\textbf{BatchNorm} normalizes layer inputs per mini-batch, then rescales with learnable $\gamma,\beta$. Speeds up and stabilizes training, allows higher learning rates, mild regularization.
-	\end{definitionbox}
-	
 	\begin{formulabox}
+		Start from a random image $x$, repeat: forward to get neuron activation $a_{i,j}(x)$, backprop to pixels, then
 		\[
-		\hat x = \frac{x - \mu_B}{\sqrt{\sigma_B^2 + \epsilon}}, \qquad
-		y = \gamma \hat x + \beta
+		x \leftarrow x + \alpha\,\frac{\partial a_{i,j}(x)}{\partial x} + \text{(regularisation)}
 		\]
 	\end{formulabox}
-	
-	\textbf{Other norms}: Layer, Group, Instance normalization.
-	
-	\subsection{Exam Tips}
-	
+	\begin{itemize}[leftmargin=*]
+		\item Gradient \textbf{w.r.t.\ the input}, not the weights -- weights are fixed. The \textbf{regularisation} term keeps pixels in natural ranges (avoids extreme values).
+	\end{itemize}
+
+	\subsection{Data Augmentation}
+
+	\begin{definitionbox}
+		Artificially generate more training data by applying random \textbf{label-preserving} transformations. Goal: the model rarely sees the exact same image twice $\rightarrow$ less overfitting, better generalisation (a form of regularisation).
+	\end{definitionbox}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Geometric}: rotation, translation (width/height shift), flip, shear, zoom/crop.
+		\item \textbf{Photometric}: colour shift, illumination, contrast, noise.
+		\item \textbf{Caveat}: must preserve the label -- e.g.\ horizontal flip breaks text/digits (a flipped STOP sign or ``5'').
+		\item \textbf{Offline (pre-)}: build an enlarged dataset once. \textbf{Online}: transform each batch on the fly (Keras \texttt{ImageDataGenerator} $\rightarrow$ \texttt{flow}); produces ``infinite'' batches, so set \texttt{steps\_per\_epoch} $=$ \#images$/$batch.
+		\item Modern alternative: \textbf{preprocessing layers} (\texttt{RandomRotation}, \texttt{RandomFlip}\dots) inside the model $\rightarrow$ runs in the graph / on GPU.
+		\item Effect: a model trained \emph{with} augmentation stays robust on both clean and augmented test data; a model trained \emph{without} drops sharply on augmented data ($\sim$91\%$\to$78\%).
+	\end{itemize}
+
+	\subsection{Conv-Layer Pattern \& Deep Architectures}
+
+	\begin{importantbox}
+		Common CNN macro-pattern (compact notation, \emph{not} a language):
+		\[
+		\texttt{INPUT} \to [[\texttt{CONV}\to\texttt{RELU}]{*}N \to \texttt{POOL?}]{*}M \to [\texttt{FC}\to\texttt{RELU}]{*}K \to \texttt{FC}
+		\]
+		$N{\le}3$, $K{<}3$. Stacking \textbf{2+ CONV before each POOL} builds richer features before the ``destructive'' downsampling.
+	\end{importantbox}
+
+	\begin{center}\footnotesize
+	\begin{tabular}{@{}llp{6.3cm}@{}}
+		\toprule
+		Model & Year & Key idea \\
+		\midrule
+		LeNet-5  & 1998 & First successful CNN (digits/zip codes). \texttt{[CONV-POOL-CONV-POOL-FC-FC]}, $5{\times}5$ convs. \\
+		AlexNet  & 2012 & ILSVRC breakout (16\% vs 26\%). Deeper, ReLU (first use), dropout, heavy augmentation, 2-GPU, \textbf{$\sim$60M} params. \\
+		ZFNet    & 2013 & AlexNet with better hyper-parameters. \\
+		VGGNet   & 2014 & \textbf{Only $3{\times}3$ CONV} ($S{=}1,P{=}1$) + $2{\times}2$ POOL; 16--19 layers. Most memory in CONV, most params in FC ($\sim$138M). \\
+		GoogLeNet& 2014 & \textbf{Inception} module + $1{\times}1$ bottlenecks; \textbf{no FC}; only \textbf{$\sim$5M} params (12$\times$ less than AlexNet); 22 layers. \\
+		ResNet   & 2015 & \textbf{Residual blocks} $\rightarrow$ 152 layers; ILSVRC'15 winner (3.6\%). BN after every conv, global avg pool. \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
 	\begin{examtipbox}
-		Use He init with ReLU, Xavier with tanh. BatchNorm uses batch statistics at train time but running averages at test time. ReLU + good init + BatchNorm together largely solve vanishing gradients.
+		\textbf{Worked AlexNet CONV1}: input $227{\times}227{\times}3$, $96$ filters $11{\times}11$, $S{=}4$, $P{=}0$.
+		\begin{itemize}[leftmargin=*]
+			\item Output: $O=\frac{227-11}{4}+1=55 \Rightarrow 55{\times}55{\times}96$.
+			\item Params: $96{\cdot}(11{\cdot}11{\cdot}3)+96 = \mathbf{34\,944}\approx35\text{K}$.
+			\item Then POOL1 $3{\times}3,S{=}2$: $O=\frac{55-3}{2}+1=27 \Rightarrow 27{\times}27{\times}96$, \textbf{0} params.
+		\end{itemize}
 	\end{examtipbox}
-	
+
+	\subsection{VGG: Small Filters, Deeper}
+
+	\begin{importantbox}
+		A stack of \textbf{three $3{\times}3$} convs ($S{=}1$) has the \textbf{same receptive field as one $7{\times}7$} conv, but with \textbf{fewer parameters} ($3{\cdot}3C^2$ vs $7{\cdot}7C^2$) and \textbf{more non-linearities} (3 ReLUs vs 1). This is why small-filter deep stacks beat large-filter shallow ones.
+	\end{importantbox}
+
+	\subsection{GoogLeNet: Inception Module}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Idea}: don't pick one filter size -- run $1{\times}1$, $3{\times}3$, $5{\times}5$ convs and a $3{\times}3$ pool \textbf{in parallel}, then \textbf{depth-concatenate} the outputs (``network in network'', multi-scale receptive fields).
+		\item \textbf{$1{\times}1$ bottleneck} convs reduce depth \emph{before} the expensive $3{\times}3$/$5{\times}5$ $\rightarrow$ far fewer operations (preserve spatial size, project channels).
+		\item \textbf{Auxiliary classifiers} at intermediate layers inject extra gradient into early layers (helps training the deep stack). \textbf{No FC} layers $\rightarrow$ tiny parameter count.
+	\end{itemize}
+
+	\subsection{ResNet: Residual Connections}
+
+	\begin{importantbox}
+		\textbf{Degradation problem}: a deeper plain net (56 layers) had \emph{higher} train \emph{and} test error than a shallower one (20 layers) -- \textbf{not} overfitting, but an \textbf{optimisation} difficulty.
+	\end{importantbox}
+
+	\begin{formulabox}
+		Fit a \textbf{residual} instead of the full mapping:
+		\[
+		y = \mathcal{F}(x,\{W_i\}) + x, \qquad \mathcal{F}(x) = H(x) - x
+		\]
+	\end{formulabox}
+	\begin{center}
+	\begin{tikzpicture}[node distance=8mm, >=Stealth,
+		b/.style={draw, fill=orange!18, minimum width=20mm, minimum height=6mm, font=\scriptsize}]
+		\node (x) {$x$};
+		\node[b, above=of x] (c1) {$3{\times}3$ conv};
+		\node[b, above=of c1] (c2) {$3{\times}3$ conv};
+		\node[draw, circle, above=of c2, inner sep=1pt] (p) {$+$};
+		\node[above=6mm of p, font=\scriptsize] (y) {ReLU $\to y$};
+		\draw[->](x)--(c1); \draw[->](c1)-- node[right,font=\scriptsize]{ReLU}(c2); \draw[->](c2)--(p); \draw[->](p)--(y);
+		\draw[->] (x.east) -- ++(16mm,0) |- node[right, pos=0.25, font=\scriptsize]{identity $x$} (p.east);
+	\end{tikzpicture}
+	\end{center}
+	\begin{itemize}[leftmargin=*]
+		\item The \textbf{skip/identity connection} lets gradients flow directly $\rightarrow$ trains 100+ layers without vanishing gradients; if a block isn't useful it can \textbf{fall back to identity} ($\mathcal{F}\to0$).
+		\item \textbf{Bottleneck} ($1{\times}1\to3{\times}3\to1{\times}1$) to go beyond 50 layers; BN after every conv; global average pooling $\rightarrow$ single FC; no dropout.
+	\end{itemize}
+
+	\subsection{Exam Tips}
+
+	\begin{examtipbox}
+		Likely questions:
+		\begin{itemize}[leftmargin=*]
+			\item \emph{Compute output size / \#params} through a conv/pool stack ($O=\frac{W-w+2P}{S}+1$, $N=whCD+D$); pooling \& activations add \textbf{0} params; FC layers dominate.
+			\item \emph{Why three $3{\times}3$ instead of one $7{\times}7$?} -- same receptive field, fewer params, more non-linearity (VGG).
+			\item \emph{What is an Inception module / a $1{\times}1$ conv for?} -- parallel multi-scale filters + depth concat; $1{\times}1$ = channel bottleneck to cut compute.
+			\item \emph{What problem does ResNet solve and how?} -- degradation (optimisation, not overfitting); residual $y=\mathcal{F}(x)+x$ with identity skip.
+			\item \emph{Why data augmentation?} -- fights overfitting by label-preserving transforms; name online vs offline.
+			\item \emph{How are CNN features visualised?} -- activation maps; gradient-ascent on the input to maximise a neuron.
+		\end{itemize}
+		\textbf{Common mistakes:} forgetting the bias/$+1$ in counts; saying the deeper-net failure in ResNet is overfitting (it's an optimisation/degradation problem); augmenting in a way that breaks the label (flipping text); confusing \emph{which} layers hold most params (FC) vs most memory/compute (CONV).
+	\end{examtipbox}
+	% ==================================================
+	\section{Training Deep Networks: Vanishing Gradients}
+	% ==================================================
+
+	\subsection{The Vanishing / Exploding Gradient Problem}
+
+	\begin{definitionbox}
+		In deep nets the backprop gradient is a \textbf{product} of per-layer Jacobians. If the factors are $<1$ it \textbf{vanishes} (exponentially with depth) $\rightarrow$ early layers barely learn; if $>1$ it \textbf{explodes} $\rightarrow$ unstable. Glorot \& Bengio (2010): with sigmoid + naive init, gradients shrink in earlier layers.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		Per-layer backward step (from backprop):
+		\[
+		\frac{\partial L}{\partial a^{[l-1]}} = \frac{\partial L}{\partial a^{[l]}}\odot \underbrace{\sigma'(z^{[l]})}_{\text{small if saturated}}\cdot\, \underbrace{W^{[l]}}_{\text{ill-conditioned}\Rightarrow\,\text{vanish/explode}}
+		\]
+	\end{formulabox}
+	\begin{importantbox}
+		The cure: keep the distribution of the logits $z^{[l]}=a^{[l-1]}(W^{[l]})^{\top}+b^{[l]}$ in the activation's \textbf{dynamic range}, in \emph{both} forward and backward passes. Three levers: \textbf{activation function}, \textbf{normalisation} (input + batch), \textbf{weight initialisation}.
+	\end{importantbox}
+
+	\subsection{Activation Functions}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Non-linearity is essential}: without it the whole net collapses to one linear layer (no representational capacity). Exception: the \emph{output} layer of a regression task (linear).
+		\item \textbf{Saturating / S-shaped} (sigmoid, tanh, softsign, step): for large $|z|$ the output flattens $\rightarrow$ $\sigma'(z)\approx0$ $\rightarrow$ \textbf{vanishing gradients}. A wider logit distribution hits saturation more often.
+		\item \textbf{ReLU} $\max(0,z)$: no saturation for $z>0$, but \textbf{dying units} -- for $z<0$ both activation \emph{and} derivative are $0$ $\rightarrow$ neuron never updates, stays ``dead''.
+		\item \textbf{Leaky ReLU} $\max(\eta z, z)$ ($\eta\approx0.01$) / \textbf{ELU}: non-zero gradient for $z<0$ $\rightarrow$ no dying units.
+	\end{itemize}
+
+	\begin{center}\footnotesize
+	\begin{tabular}{@{}lll@{}}
+		\toprule
+		Function & Formula & Note \\
+		\midrule
+		Sigmoid    & $1/(1+e^{-z})$ & saturates; binary-class output \\
+		Tanh       & $\tanh z$ & saturates; zero-centred \\
+		ReLU       & $\max(0,z)$ & dying units \\
+		Leaky ReLU & $\max(\eta z,z)$ & fixes dying units \\
+		GeLU       & $z\,\Phi(z)$ & $\Phi$ = Gaussian CDF; transformers \\
+		SiLU/Swish & $z\,\sigma(z)$ & modern vision models \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Last-layer by task}: binary $\rightarrow$ sigmoid; multiclass $\rightarrow$ softmax; regression $\rightarrow$ none (linear).
+		\item Default hidden choices: ReLU/Leaky\,ReLU (classical), GeLU (transformers), SiLU (modern vision).
+	\end{itemize}
+
+	\subsection{Input Normalisation}
+
+	\begin{definitionbox}
+		Make input features \textbf{centred} (zero mean) and on \textbf{similar scales} so logits land in the activation's dynamic range. Stats are computed on the \textbf{training set only} (then reused for val/test).
+	\end{definitionbox}
+
+	\begin{formulabox}
+		\textbf{z-normalisation / standardisation} (per feature $k$):
+		\[
+		x'^{(i)}_k = \frac{x^{(i)}_k - \mu_k}{\sigma_k}, \quad
+		\mu_k=\tfrac1N\textstyle\sum_i x_k^{(i)},\;\;
+		\sigma_k^2=\tfrac1N\textstyle\sum_i (x_k^{(i)}-\mu_k)^2
+		\]
+		\textbf{Min-max} $\rightarrow[0,1]$: $\dfrac{x-\min_k}{\max_k-\min_k}$; \quad centred $\rightarrow[-1,1]$: $2\cdot\dfrac{x-\min_k}{\max_k-\min_k}-1$.
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Why}: removes arbitrary units; lets weight-init rules be \emph{data-independent}; learning starts on the patterns, not on correcting scale/offset. Large features $\Rightarrow$ large $\Delta W$ but small $W$ needed ($xW\!\sim\!1$) -- a conflict normalisation removes.
+		\item \textbf{Standardisation} for Gaussian-like / unbounded features; \textbf{min-max} when natural bounds exist. Images: stats over all pixels (not per pixel). PyTorch: \texttt{transforms.Normalize(mean,std)}.
+	\end{itemize}
+
+	\subsection{Batch Normalisation}
+
+	\begin{definitionbox}
+		\textbf{BatchNorm} (Ioffe \& Szegedy 2015): normalise the logits $Z$ of a layer using the \textbf{mini-batch} mean/std (per feature), then apply a \textbf{learnable} scale $\gamma$ and shift $\beta$, then the activation. Applicable to any layer.
+	\end{definitionbox}
+
+	\begin{formulabox}
+		Per feature $k$, over batch of size $N_B$:
+		\[
+		\hat Z = \frac{Z-\mu_k}{\sqrt{\sigma_k^2+\epsilon}}, \qquad \overline Z = \gamma_k \hat Z + \beta_k
+		\]
+		\textbf{Test/production} (no batch): use running averages, $\hat\mu^{(r+1)}=(1-\nu)\hat\mu^{(r)}+\nu\mu^{(r)}$ (same for $\sigma$).
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item The bias $b$ is redundant (absorbed by $\beta$). Place BN \textbf{before the non-linearity}: \texttt{CONV/FC $\to$ BN $\to$ activation ($\to$ Dropout)}.
+		\item \textbf{Effects}: much faster training (Inception: $\sim$2--14$\times$ fewer steps), allows higher learning rates, mild regularisation, even rescues sigmoid nets.
+		\item \textbf{Why it works}: original claim = reduce ``internal covariate shift''; later work (Santurkar 2018) argues it mainly \textbf{smooths the loss surface} / decouples layers $\rightarrow$ more robust training.
+		\item \textbf{Train vs test differ} $\rightarrow$ must call \texttt{model.train()} / \texttt{model.eval()}. Needs a \textbf{large enough batch}; small batches $\rightarrow$ use \textbf{LayerNorm} (per sample, same at train/test).
+		\item Variants: \textbf{BatchNorm} (over N,H,W per channel), \textbf{LayerNorm} (over C,H,W per sample), \textbf{InstanceNorm} (over H,W per channel per sample), GroupNorm.
+	\end{itemize}
+
+	\subsection{Parameter Initialisation}
+
+	\begin{importantbox}
+		\textbf{Random} init breaks symmetry (else all neurons learn the same). \textbf{Scale} the variance so logit/gradient variance is preserved across layers (no early saturation). Choose the scheme by the \textbf{activation}.
+	\end{importantbox}
+
+	\begin{formulabox}
+		Forward stability wants $\mathrm{Var}(W)=\dfrac{1}{c\,N_{l-1}}$ (fan-in), backward wants $\dfrac{1}{c\,N_l}$ (fan-out); compromise:
+		\[
+		\textbf{Xavier/Glorot (tanh/sig)}:\ \mathrm{Var}(w)=\frac{2}{n_{in}+n_{out}}, \qquad
+		\textbf{He/Kaiming (ReLU)}:\ \mathrm{Var}(w)=\frac{2}{n_{in}}
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $c$ = activation ``gain'' (ReLU keeps $\approx$ half the signal $\Rightarrow$ factor 2). He has the extra $\sqrt2$ vs Xavier.
+		\item PyTorch default: Kaiming (leaky ReLU), uniform; \texttt{torch.nn.init.\{xavier,kaiming\}\_\{normal,uniform\}\_}. Keras: \texttt{GlorotUniform}, \texttt{HeNormal}, \dots\ via \texttt{kernel\_initializer}.
+	\end{itemize}
+
+	\subsection{Exploding Gradients: Gradient Clipping}
+
+	\begin{itemize}[leftmargin=*]
+		\item When gradients explode (steep ``cliffs'' in the loss, common in \textbf{RNNs}), \textbf{clip} before the update: by \textbf{norm} (\texttt{clipnorm}) or per-component \textbf{value} (\texttt{clipvalue}).
+		\item PyTorch: \texttt{torch.nn.utils.clip\_grad\_norm\_(model.parameters(), max\_norm)} between \texttt{backward()} and \texttt{step()}. Keras: optimiser args \texttt{clipnorm}/\texttt{clipvalue}.
+	\end{itemize}
+
+	\subsection{Exam Tips}
+
+	\begin{examtipbox}
+		Likely questions:
+		\begin{itemize}[leftmargin=*]
+			\item \emph{Why do gradients vanish, and how to fix?} -- product of Jacobians shrinks with depth/saturation; fix with non-saturating activations, normalisation, good init (and ResNet skips).
+			\item \emph{Why ReLU over sigmoid?} -- no saturation for $z>0$ $\rightarrow$ non-vanishing gradient; but watch \textbf{dying units} (use Leaky ReLU).
+			\item \emph{Xavier vs He} -- Xavier $\frac{2}{n_{in}+n_{out}}$ for tanh/sigmoid; He $\frac{2}{n_{in}}$ for ReLU (extra factor 2). Be ready to state the formula.
+			\item \emph{Write the BatchNorm equations}; explain train-vs-test difference (batch stats vs running averages) and the role of $\gamma,\beta$.
+			\item \emph{Why normalise inputs?} -- dynamic range + data-independent init; standardisation vs min-max.
+			\item \emph{Exploding gradients?} -- gradient clipping (esp.\ RNNs).
+		\end{itemize}
+		\textbf{Common mistakes:} forgetting BN behaves differently in \texttt{eval()} (running stats); swapping Xavier/He; thinking ReLU has \emph{no} failure mode (dying units); placing BN after the activation when the convention is before; normalising val/test with their \emph{own} stats instead of the training stats.
+	\end{examtipbox}
 	% ==================================================
 	\section{Deep Learning Frameworks and Hardware Considerations}
 	% ==================================================

@@ -854,6 +854,37 @@ Cross-entropy pushes the policy toward the given best move; MSE pushes the value
 \section{Additional Questions}
 % ##################################################
 % ==================================================
+\subsection{Deep Learning Intro}
+% ==================================================
+
+\begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
+
+\q \textbf{Supervised vs.\ unsupervised systems.} For each example, decide whether you would use a supervised or an unsupervised learning algorithm, and explain why.
+\begin{enumerate}[label=\textbf{(\alph*)}]
+  \item Given email labeled as spam/not spam, learn a spam filter.
+  \item Given a set of news articles found on the web, group them into sets of related articles.
+  \item Given a database of customer data, automatically discover market segments and group customers into different segments.
+  \item Given a dataset of patients diagnosed as either having glaucoma or not, learn to classify new patients as having glaucoma or not.
+\end{enumerate}
+\begin{answerbox}
+The deciding factor is whether labels (target outputs) are given.
+\textbf{(a) Supervised} -- emails carry spam/not-spam labels; learn a mapping input$\to$label (binary classification).
+\textbf{(b) Unsupervised} -- no labels/categories given; we discover structure by clustering similar articles.
+\textbf{(c) Unsupervised} -- segments are not predefined; clustering \emph{discovers} them from the data.
+\textbf{(d) Supervised} -- each patient has a known glaucoma/no-glaucoma label; learn a classifier (binary classification).
+\end{answerbox}
+
+\q \textbf{Classification vs.\ regression systems.} Can we transform a regression problem into a classification problem? What would be the benefits of doing so?
+\begin{answerbox}
+Yes -- \textbf{discretize} the continuous target into bins/intervals, then predict the bin (e.g.\ house price $\to$ ``low/medium/high'', age $\to$ decade buckets). This is also called \emph{binning} or \emph{quantization}.
+
+\textbf{Benefits:} handles non-linear / multi-modal targets without assuming a functional form; more robust to outliers and label noise; gives a calibrated probability per class and an easy notion of confidence; lets you use classification losses/metrics (cross-entropy, accuracy) and is often easier to optimize.
+\textbf{Cost:} you lose precision/ordering information and must choose bin boundaries; too few bins underfit, too many give sparse, hard-to-learn classes.
+\end{answerbox}
+
+\end{enumerate}
+
+% ==================================================
 \subsection{Introduction to Deep Learning -- Tensors}
 % ==================================================
 
@@ -877,6 +908,36 @@ $AB \in \mathbb{R}^{4\times 2}$ (inner dims 5 match). $BA$ is undefined: inner d
 \q Two tensors of shape \texttt{(3,1)} and \texttt{(1,4)} are added. What is the result shape?
 \begin{answerbox}
 Broadcasting stretches the size-1 axes, giving shape \texttt{(3,4)}.
+\end{answerbox}
+
+\q Define the rank and shape of a \textbf{grayscale image} that is $900$ wide and $550$ tall.
+\begin{answerbox}
+Rank 2. Shape \texttt{(550, 900)} following (height, width); a single intensity value per pixel means no channel axis. Frameworks often keep an explicit channel dimension though: \textbf{PyTorch} stores it channels-first as \texttt{(1, 550, 900)} -- i.e.\ rank 3 with $C=1$ (\texttt{ToTensor} always returns \texttt{(C, H, W)}); PIL/NumPy/TensorFlow use channels-last \texttt{(550, 900, 1)}.
+\end{answerbox}
+
+\q Define the rank and shape of a \textbf{color image} that is $320$ wide and $480$ tall.
+\begin{answerbox}
+Rank 3. \textbf{NumPy} (channels-last, the reference here): \texttt{(480, 320, 3)} as (height, width, channels) with 3 RGB channels -- this is what \texttt{imageio}/PIL$\to$\texttt{np.array} give. PyTorch reorders to channels-first \texttt{(3, 480, 320)}.
+\end{answerbox}
+
+\q Define the rank and shape of a \textbf{simple 2-D embedding} of a single word, e.g.\ $\mathrm{beer}=[-0.9,-1.0]$.
+\begin{answerbox}
+A single embedding vector is rank 1 with shape \texttt{(2,)} (one number per feature axis: solidity, eatability). A table of $V$ such words would be rank 2, shape \texttt{(V, 2)}. \textbf{NumPy:} \texttt{np.array([-0.9, -1.0])} has shape \texttt{(2,)}; stacking the vocabulary gives \texttt{(V, 2)}.
+\end{answerbox}
+
+\q Define the rank and shape of \textbf{stereo sound}, $2$ seconds at a sampling rate of $44.1$\,kHz.
+\begin{answerbox}
+Samples per channel $= 2 \times 44100 = 88200$, with 2 channels (left/right). Rank 2. \textbf{NumPy:} \texttt{scipy.io.wavfile.read} returns \texttt{(88200, 2)} as (samples, channels). Audio libraries that put channels first store \texttt{(2, 88200)}.
+\end{answerbox}
+
+\q For the \textbf{MNIST} dataset ($60000$ images, $28\times28$ grayscale pixels), give the rank and shape of: (a) one image, (b) the whole dataset, (c) a batch of $32$ images.
+\begin{answerbox}
+\textbf{NumPy} (channels-last reference): (a) one image rank 2, \texttt{(28, 28)}; (b) whole dataset rank 3, \texttt{(60000, 28, 28)}; (c) batch of 32 rank 3, \texttt{(32, 28, 28)}. Adding an explicit channel axis (grayscale $=1$) raises each by one rank: NumPy/TensorFlow channels-last \texttt{(32, 28, 28, 1)}, PyTorch channels-first \texttt{(32, 1, 28, 28)}.
+\end{answerbox}
+
+\q \textbf{What would be a 5-D tensor?} Give a concrete example and break down the rank.
+\begin{answerbox}
+A \textbf{batch of colored videos}. A colored frame is rank 3 (height, width, channels) $+$ time/frames (rank 1) $+$ batch (rank 1) $=$ rank 5. \textbf{NumPy} (channels-last): \texttt{(batch, frames, height, width, channels)}; PyTorch channels-first: \texttt{(batch, frames, channels, height, width)}.
 \end{answerbox}
 
 \end{enumerate}
