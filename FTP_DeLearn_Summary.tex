@@ -1765,6 +1765,7 @@
 	\end{formulabox}
 	\begin{itemize}[leftmargin=*]
 		\item $c$ = activation ``gain'' (ReLU keeps $\approx$ half the signal $\Rightarrow$ factor 2). He has the extra $\sqrt2$ vs Xavier.
+		\item $n_{in}+n_{out}$ = number of input and output connections
 		\item PyTorch default: Kaiming (leaky ReLU), uniform; \texttt{torch.nn.init.\{xavier,kaiming\}\_\{normal,uniform\}\_}. Keras: \texttt{GlorotUniform}, \texttt{HeNormal}, \dots\ via \texttt{kernel\_initializer}.
 	\end{itemize}
 
@@ -1793,30 +1794,179 @@
 	\section{Deep Learning Frameworks and Hardware Considerations}
 	% ==================================================
 	
-	\subsection{Frameworks}
-	\begin{itemize}[leftmargin=*]
-		\item \textbf{PyTorch}: dynamic (define-by-run) graphs, Pythonic, research-favored.
-		\item \textbf{TensorFlow/Keras}: static \& eager modes, strong deployment.
-		\item \textbf{Autograd}: automatic differentiation builds the graph and computes gradients via reverse-mode AD (= backprop).
-	\end{itemize}
-	
-	\subsection{Hardware}
-	\begin{itemize}[leftmargin=*]
-		\item \textbf{CPU}: few powerful cores; flexible, low throughput.
-		\item \textbf{GPU}: thousands of cores; massively parallel matrix ops.
-		\item \textbf{TPU}: specialized matrix-multiply accelerators.
-		\item \textbf{Mixed precision} (FP16/BF16): faster, less memory.
-		\item \textbf{Parallelism}: data parallel (split batch) vs.\ model parallel (split model).
-	\end{itemize}
-	
-	\subsection{Exam Tips}
-	
+	% --------------------------------------------------
+	\subsection{Computational Graphs: the Foundation}
+	% --------------------------------------------------
+
+	\begin{definitionbox}
+		A \textbf{computational graph} is a \textbf{directed acyclic graph (DAG)} where \emph{nodes} are operations/variables and \emph{edges} are data links. 3 variable types: \textbf{input} (incl.\ tunable parameters), \textbf{intermediary}, \textbf{output}. Node complexity is free: from a $+$ up to a full MLP layer.
+	\end{definitionbox}
+
+	\textbf{Why frameworks are built on graphs -- the 5 advantages:}
+	\begin{enumerate}[leftmargin=*]
+		\item \textbf{Intuitive backprop:} gradient of the output w.r.t.\ any parameter $=$ chain rule, by back-propagating the upstream gradient $\times$ the \emph{local} gradient of each node.
+		\item \textbf{Easy to add new nodes:} just implement the \texttt{forward} / \texttt{backward} pair (local gradient) -- the rest is automatic.
+		\item[3--4.] \textbf{Composition / factorisation:} any architecture is built from atomic nodes (no manual global gradient); a sub-graph can be \emph{fused} into one node if an analytic gradient exists (e.g.\ sigmoid).
+		\item[5.] \textbf{Loss \& update rules are also nodes:} the loss $J$ plugs onto the end of the graph; gradients are back-propagated \emph{from} it.
+	\end{enumerate}
+
+	\textbf{Patterns in the backward flow} (interpreting each gate by what it does to the gradient):
+
+	\begin{center}
+	\begin{tabular}{@{}llp{8.2cm}@{}}
+		\toprule
+		Gate & Role & Backward behaviour \\
+		\midrule
+		$+$        & \textbf{distributor} & passes the same upstream gradient to all inputs \\
+		$\times$   & \textbf{switcher}     & routes gradient $\times$ the \emph{other} input's value \\
+		$(\cdot)^2$ & \textbf{amplifier} & amplifies/scales path \\
+		$\max$-pool &  \textbf{router} & sends gradient only to the selected path \\
+		fan-out (multi-output) & \textbf{cumulator} & incoming gradients \emph{add} at the node \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		These patterns inspired architecture design: the \emph{distributor} ($+$) $\to$ skip connections in \textbf{ResNet}; the \emph{cumulator} (multi-output) $\to$ \textbf{GoogLeNet} multiple outputs; the \emph{router} ($\max$) $\to$ max-pooling routes all updates to the winning feature.
+	\end{importantbox}
+
+	\textbf{Graph folding / node fusion (optimisation):} a compiler (e.g.\ \textbf{XLA} for TF) rewrites a sub-graph into an equivalent, cheaper one -- e.g.\ $(x_1^2)(x_2^2) \to (x_1 x_2)^2$ saves one operator and one intermediary node.
+
 	\begin{examtipbox}
-		Reverse-mode autodiff is efficient when outputs $\ll$ inputs (scalar loss, many params) -- exactly the DL setting. GPUs win because training is dominated by large matrix multiplications. Bigger batches use the hardware better but may hurt generalization.
+		``\emph{Are computational graphs faster?}'' $\to$ \textbf{No, not by themselves.} They give an elegant OO forward/backward implementation; real speed-ups come from (a) graph \emph{compilation/optimisation} (fusion, fitting the processor) and (b) \textbf{tensors + batching} on fast CPU/GPU libraries. A backward node must \emph{store its forward values} $\Rightarrow$ training costs \textbf{more memory} than inference.
 	\end{examtipbox}
-	
+
+	% --------------------------------------------------
+	\subsection{Static vs.\ Dynamic (Eager) Execution}
+	% --------------------------------------------------
+
+	\begin{center}
+	\begin{tabular}{@{}p{4cm} p{5.4cm} p{5.4cm}@{}}
+		\toprule
+		& \textbf{Static graph} (define-then-run) & \textbf{Dynamic / eager} (define-by-run) \\
+		\midrule
+		Execution & build $\to$ compile $\to$ run & ops run immediately \\
+		Code      & less readable, harder to debug & readable, easy to debug, ``Pythonic'' \\
+		Performance & usually \emph{better} (optimised) & usually \emph{lower} (built on the fly) \\
+		Architecture & fixed once compiled & can change per iteration \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	% --------------------------------------------------
+	\subsection{Deep Learning Frameworks}
+	% --------------------------------------------------
+
+	\textbf{The zoo} (\emph{italic = deprecated}): academia -- \emph{Theano}, \emph{Torch}, \emph{Caffe}, MXNet; companies -- TensorFlow (Google), PyTorch (Facebook/Meta), \emph{Caffe2}, \emph{CNTK} (Microsoft), PaddlePaddle (Baidu). Two big players remain: \textbf{TensorFlow} and \textbf{PyTorch}.
+
+	\begin{center}
+	\begin{tabular}{@{}p{2.7cm} p{5.3cm} p{5.3cm}@{}}
+		\toprule
+		& \textbf{TensorFlow} & \textbf{PyTorch} \\
+		\midrule
+		Origin    & Google, based on Theano & Facebook/Meta, based on Torch \\
+		Initial mode & \textbf{static} graph (eager since 2.0) & \textbf{dynamic} ``eager'' (can compile) \\
+		Both modes & yes & yes \\
+		Learning curve & steeper $\to$ high-level API (Keras) & smoother, more ``Python native'' \\
+		Best at   & \textbf{production}, scaling, edge/mobile & \textbf{prototyping}, research, training control \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{definitionbox}
+		\textbf{4 reasons to use a DL framework:} (1) build big computational graphs easily; (2) compute losses \& gradients for the update rule automatically; (3) ready-made SOTA regularisers/optimisers; (4) switch CPU$\leftrightarrow$GPU with one line.
+	\end{definitionbox}
+
+	\textbf{TensorFlow training pattern (idea, not syntax):}
+	\begin{itemize}[leftmargin=*]
+		\item \texttt{@tf.function} marks a function whose body \emph{defines} the graph (no compute until called).
+		\item Graph \textbf{inputs} = function arguments (features $x$, weights $w$, targets $y$); \textbf{outputs} = predictions, loss, gradients fetched after running.
+		\item Choose the device: \texttt{with tf.device('/GPU:0')}.
+		\item \textbf{Pitfall:} updating weights with NumPy in the Python loop copies them \textbf{CPU$\leftrightarrow$GPU every step} $\Rightarrow$ slow. Fix: use a \texttt{tf.Variable} + a built-in optimiser so updates stay on the GPU.
+	\end{itemize}
+
+	% --------------------------------------------------
+	\subsection{CPU vs.\ GPU}
+	% --------------------------------------------------
+
+	\begin{center}
+	\begin{tabular}{@{}lll@{}}
+		\toprule
+		& \textbf{CPU} (Central) & \textbf{GPU} (Graphical) \\
+		\midrule
+		Cores       & few ($\sim$10) & many ($\sim$1000) \\
+		Clock       & fast ($\sim$4\,GHz) & slower ($\sim$1.5\,GHz) \\
+		Cache       & large & small \\
+		Strength    & \textbf{sequential} tasks & \textbf{parallel} tasks \\
+		Providers   & Intel, AMD & \textbf{NVIDIA}, AMD \\
+		\bottomrule
+	\end{tabular}
+	\end{center}
+
+	\begin{importantbox}
+		\textbf{Why GPUs for DL:} the core op is \textbf{matrix multiplication} ($A\times B$, e.g.\ batch $\times$ inputs $\to$ logits). Every output cell is computed \emph{independently} $\Rightarrow$ ANNs are \textbf{``embarrassingly parallel''}, a perfect match for many slow cores.
+	\end{importantbox}
+
+	\textbf{Programming GPUs:}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{CUDA} -- NVIDIA only; low-level C-like API; optimised higher-level libs \texttt{cuBLAS}, \texttt{cuFFT}, \textbf{\texttt{cuDNN}}.
+		\item \textbf{AMD ROCm} -- \texttt{HIP} ``write once'' + \texttt{hipify} converts CUDA $\to$ AMD.
+		\item \textbf{OpenCL} -- runs on anything, but usually slower on NVIDIA.
+		\item In practice: we call \emph{existing} GPU libraries from Python -- we don't write CUDA.
+	\end{itemize}
+
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{GPU bottleneck:} disk$\to$GPU data transfer. Fixes: load data into RAM, fast SSDs, \textbf{CPU prefetch threads} (done by the framework), multi-GPU bus \textbf{NV-Link}.
+		\item \textbf{Tensor cores} (NVIDIA Volta/V100, 2017+): hardware $4{\times}4{\times}4$ matrix multiply-accumulate (MMA) instead of scalar ops. Google's \textbf{TPU} is the same idea.
+		\item \textbf{Backend network} for multi-server training: \emph{GPU fabric} (NV-Link) between boards, \emph{InfiniBand} between servers.
+		\item \textbf{HW evolution:} V100 $\to$ A100 $\to$ H100/GH200 $\to$ \textbf{B200 (Blackwell)} -- more HBM memory \& bandwidth, native \textbf{FP4} ``Transformer Engine'', NVLink 5; clearly optimised for LLMs.
+	\end{itemize}
+
+	\begin{examtipbox}
+		Likely Qs: ``\emph{Why are GPUs faster than CPUs for DL?}'' (parallel matrix mult, embarrassingly parallel -- \emph{not} faster per core); ``\emph{CPU vs GPU trade-offs?}'' (few fast cores vs many slow cores); ``\emph{What is the typical GPU bottleneck?}'' (data transfer, not compute). Don't say the graph itself is fast -- \textbf{tensors + batching} are.
+	\end{examtipbox}
+
+	% --------------------------------------------------
+	\subsection{AI and Sustainability}
+	% --------------------------------------------------
+
+	\begin{definitionbox}
+		Two distinct branches: \textbf{AI \emph{for} sustainability} = using AI to cut emissions (smart logistics, energy efficiency, predictive maintenance, peak-load adaption). \textbf{Sustainability \emph{of} AI} = the footprint of AI itself, split into \emph{environmental} (energy + carbon) and \emph{ethical} AI.
+	\end{definitionbox}
+
+	\textbf{Why it matters:} training compute grew $\sim\!4\times$/year in the deep-learning era; projections say IT may use up to \textbf{20\% of world electricity by 2030}, AI a big share. Inference cost $\propto$ energy. (EU \textbf{AI Act} + \textbf{CSRD} reporting push firms to disclose AI emissions.)
+
+	\begin{formulabox}
+		\[ \text{Emissions}_{\text{CO}_2} \;=\; \text{Energy}_{\text{consumed}} \times \text{Intensity}_{\text{carbon}} \]
+		\[ \text{Energy}_{\text{process}} \;=\; \textstyle\sum \text{Runtime} \times \big(P_{\text{CPU}} + P_{\text{GPU}} + P_{\text{RAM}} + \dots\big) \]
+		\[ \text{Energy}_{\text{consumed}} \;=\; \text{Energy}_{\text{process}} \times \text{PUE} \times \text{PSF} \]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item Energy in \textbf{kWh}; carbon intensity in \textbf{gCO\textsubscript{2}eq/kWh}; emissions in \textbf{gCO\textsubscript{2}eq}.
+		\item \textbf{Intensity} depends mostly on \emph{where} (country energy mix) the model runs.
+		\item \textbf{PUE} (Power Usage Effectiveness) $= P_{\text{facility}}/P_{\text{IT}}$: overhead for cooling, lighting, delivery ($\geq 1$).
+		\item \textbf{PSF} (Pragmatic Scaling Factor): how many times the computation is repeated (e.g.\ hyper-parameter tuning $=$ hundreds of trainings).
+	\end{itemize}
+
+	\textbf{4 levels to measure} (onion, inside $\to$ out): \textbf{L1} IT process / AI model $\to$ \textbf{L2} hardware (CPU/GPU/RAM) $\to$ \textbf{L3} data centre $\to$ \textbf{L4} geolocalised energy source. (L1$\leftrightarrow$L2 is tricky: GPU sharing, virtualisation overhead.)
+
+	\textbf{How to measure a specific model -- 2 approaches:}
+	\begin{itemize}[leftmargin=*]
+		\item \textbf{Metering tool} (plug power meter): measures the \emph{whole} server+GPU, but also idle time.
+		\item \textbf{Software power models (SPM):} read HW counters -- \textbf{RAPL} (Intel CPU), \textbf{NVIDIA-SMI} (GPU), Apple \texttt{powermetrics}. Fine granularity, but \emph{underestimate} by $\sim$20--30\% (ignore cooling, AC/DC, board).
+		\item Python libs: \textbf{CodeCarbon} (most complete; explicit object / context manager / \texttt{@track\_emissions} decorator; uses Electricity Maps / CO2 Signal), CarbonTracker, Eco2AI, experiment-impact-tracker; online estimators: Green Algorithms, ML CO\textsubscript{2} Impact.
+	\end{itemize}
+
+	\begin{importantbox}
+		\textbf{What DL engineers can do:} run jobs in \emph{low-carbon regions}; report metrics \& efficient configs; release efficient code/models; weigh energy cost vs.\ benefit. The \textbf{compression $\to$ compensation $\to$ efficiency} pattern (quantisation/pruning $\to$ (Q)LoRA fine-tune $\to$ efficient backend/routing) shrinks a 70B@300\,mWh model to 30B@100\,mWh at similar accuracy.
+	\end{importantbox}
+
+	\begin{examtipbox}
+		Examiner favourites: \emph{distinguish} ``AI for sustainability'' vs ``sustainability of AI'' (don't mix them up); ``\emph{how do you measure a model's energy/carbon?}'' -- give the \textbf{Emissions $=$ Energy $\times$ Intensity} formula and name \textbf{PUE} \& \textbf{PSF}; ``\emph{which factors matter?}'' -- the \textbf{4 levels} (esp.\ country energy mix). Note SPM tools \emph{underestimate} consumption.
+	\end{examtipbox}
+
 	% ==================================================
-But	\section{Recurrent Neural Networks}
+	\section{Recurrent Neural Networks}
 	% ==================================================
 
 	\subsection{Motivation: Which Architecture for Which Data?}
