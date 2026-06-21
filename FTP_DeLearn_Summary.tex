@@ -526,8 +526,13 @@
 		s_k(z) = \frac{e^{z_k}}{\sum_{j=1}^{K} e^{z_j}} \quad(\text{softmax}), \qquad
 		\hat y = \operatorname*{arg\,max}_k \big(f_\theta(x)\big)_k
 		\]
+		\[
+		f_\theta(x)=\begin{pmatrix} s_0\big(z(x;W,b)\big)\\[-1pt] \vdots \\[-1pt] s_9\big(z(x;W,b)\big) \end{pmatrix}
+		\quad(\text{model function: vector of class probabilities, here }K{=}10)
+		\]
 	\end{formulabox}
 	\begin{itemize}[leftmargin=*]
+		\item $f_\theta(x)$: model function $\rightarrow$ probability per class for a given input; $\theta=(W,b)$.
 		\item $z$: logits; \quad $s_k$: softmax output ($s_k>0$, $\sum_k s_k=1$) $\rightarrow$ class probabilities.
 		\item MNIST shapes: $x\,(1,784)$, $W\,(10,784)$, $b\,(1,10)$, $z\,(1,10)$; bias neuron $x_0=1$.
 	\end{itemize}
@@ -564,6 +569,30 @@
 		\item CE grows very large as $\hat u_k\to 0$ (confident-and-wrong heavily punished).
 	\end{itemize}
 
+	\textbf{Binary classification} (single output $h_\theta(x)\in[0,1]$, sigmoid): special case of CE with $K{=}2$.
+	\begin{formulabox}
+		\[
+		p_\theta(y{=}1\mid x)=h_\theta(x), \qquad p_\theta(y{=}0\mid x)=1-h_\theta(x)
+		\]
+		\[
+		L_{\mathrm{CE}}\big((x,y),\theta\big)=-y\log h_\theta(x)-(1-y)\log\big(1-h_\theta(x)\big)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $y\in\{0,1\}$: true label; \quad $h_\theta(x)$: predicted $P(y{=}1)$. Only one term survives per sample.
+	\end{itemize}
+
+	\textbf{Softmax + CE (simplified, numerically robust)}: substitute $s_k=e^{z_k}/\sum_j e^{z_j}$ into CE; the $\log$ and $\exp$ partly cancel $\rightarrow$ work directly on logits $z$.
+	\begin{formulabox}
+		\[
+		\tilde L_{\mathrm{CE}}(u,z)=L_{\mathrm{CE}}\big(u,s(z)\big)=-\sum_k u_k z_k + \log\!\Big(\sum_k e^{z_k}\Big)
+		\]
+	\end{formulabox}
+	\begin{itemize}[leftmargin=*]
+		\item $z$: logits; \quad $u$: one-hot target. Avoids computing softmax explicitly $\rightarrow$ no over/underflow.
+		\item This is what \texttt{torch.nn.CrossEntropyLoss} implements $\Rightarrow$ \textbf{remove softmax from the model} (feed it logits).
+	\end{itemize}
+
 	\begin{center}
 		\begin{tabular}{p{3.2cm} p{5.4cm} p{6cm}}
 			\toprule
@@ -598,6 +627,15 @@
 	\begin{itemize}[leftmargin=*]
 		\item $s$: softmax output (prediction $\hat u$); \quad $u$: one-hot target. Update: $W\!\leftarrow\!W-\alpha\frac{1}{N}\sum_i(\hat u^{(i)}-u^{(i)})(x^{(i)})^\top$.
 	\end{itemize}
+
+	\begin{examtipbox}
+		\begin{itemize}[leftmargin=*]
+			\item \textbf{Derive:} binary CE from max-likelihood of a Bernoulli ($p^y(1-p)^{1-y}$, take $-\log$); show it is the $K{=}2$ case of softmax CE.
+			\item \textbf{Derive:} the robust softmax+CE form $\tilde L_{\mathrm{CE}}(u,z)=-\sum_k u_k z_k+\log\sum_k e^{z_k}$ by plugging softmax into CE; explain why it avoids over/underflow.
+			\item \textbf{Why not MSE for classification?} flat softmax/sigmoid gradient near 0/1 $\rightarrow$ slow; CE gradient $s-u$ is linear in the error.
+			\item Common mistakes: dropping the $(1-y)\log(1-h_\theta)$ term; sigmoid (one output, binary) vs.\ softmax (vector, multi-class).
+		\end{itemize}
+	\end{examtipbox}
 
 	% --------------------------------------------------
 	\subsection{Batch vs.\ Stochastic (Mini-Batch) Gradient Descent}
@@ -654,6 +692,10 @@
 		\end{tabular}
 	\end{center}
 
+	\begin{importantbox}
+		\textbf{Larger batch sizes allow larger learning rates}: bigger batches give a less noisy (more accurate) gradient estimate, so a larger $\alpha$ stays stable instead of oscillating/diverging.
+	\end{importantbox}
+
 	\textbf{Train/Test split \& accuracy:}
 	\begin{itemize}[leftmargin=*]
 		\item Split \textbf{Train $\mid$ Validation $\mid$ Test}; never use test info during training. Shuffle before splitting.
@@ -670,6 +712,27 @@
 		\item \texttt{Dataset} (indexed samples) $\rightarrow$ \texttt{DataLoader} (batches, \texttt{shuffle}, \texttt{num\_workers}). MNIST: $70\,000$ grayscale $28{\times}28$; \texttt{ToTensor} scales to $[0,1]$; sample $(1,28,28)$, batch $(64,1,28,28)$.
 		\item \texttt{nn.CrossEntropyLoss} combines \textbf{softmax + CE} (numerically robust) $\rightarrow$ \textbf{remove softmax from the model}.
 	\end{itemize}
+
+	\textbf{Load a dataset} (MNIST: $60\,000$ train / $10\,000$ test):
+	\begin{verbatim}
+    from torchvision import datasets
+    from torchvision.transforms import ToTensor
+    training_data = datasets.MNIST(
+        root="data",          # download target subfolder
+        train=True,           # train split (False -> test)
+        download=True,
+        transform=ToTensor()) # preprocessing -> tensor in [0,1]
+\end{verbatim}
+
+	\textbf{Wrap in a DataLoader} (batching + shuffling):
+	\begin{verbatim}
+    from torch.utils.data import DataLoader
+    train_dataloader = DataLoader(training_data,
+                                  batch_size=64, shuffle=True)
+    data_train, labels_train = next(iter(train_dataloader))
+    data_train.shape    # -> (64, 1, 28, 28)  feature batch
+    labels_train.shape  # -> (64,)            label batch
+\end{verbatim}
 
 	\begin{verbatim}
     for epoch in range(nepochs):
@@ -801,11 +864,15 @@
 	\subsection{Bias--Variance Decomposition}
 
 	\begin{formulabox}
-		\[
+		\begin{align*}
 		\underbrace{\mathbb{E}_{D}\!\big[(f_{\hat\theta(D)}(x)-y)^2\big]}_{\text{error}}
-		= \underbrace{\big(\mathbb{E}_{D}[f_{\hat\theta(D)}(x)]-y\big)^2}_{\text{bias}^2}
+		&= 
+		 \underbrace{\big(\mathbb{E}_{D}[f_{\hat\theta(D)}(x)]-y\big)^2}_{\text{bias}^2} 
+		 + 
+		 \underbrace{\mathbb{E}_{D}\!\Big[\big(f_{\hat\theta(D)}(x)-\mathbb{E}_{D}[f_{\hat\theta(D)}(x)]\big)^2\Big]}_{\text{variance}} \\[4pt]
+		&= \underbrace{\big(\mathbb{E}_{D}[f_{\hat\theta(D)}(x)]-y\big)^2}_{\text{bias}^2}
 		+ \underbrace{\mathrm{Var}_{D}\big[f_{\hat\theta(D)}(x)\big]}_{\text{variance}}
-		\]
+		\end{align*}
 	\end{formulabox}
 	\begin{itemize}[leftmargin=*]
 		\item Expectation over training sets $D\in\mathcal{D}$, for fixed $(x,y)$ (Geman \& Bienenstock, 1992).
@@ -823,6 +890,48 @@
 		\end{tabular}
 	\end{center}
 	\noindent\footnotesize More complex model $\Rightarrow$ smaller bias, larger variance. (Polynomial degree $d$: $d$ small $=$ large bias/underfit; $d$ large $=$ large variance/overfit.)\normalsize
+
+	\textbf{Diagnose from learning curves} (error vs.\ training-set size): \emph{bias} $=$ gap of training error above 0; \emph{variance} $=$ gap between validation and training error.
+	\begin{center}
+	\begin{tikzpicture}[>=Stealth, scale=0.9, font=\scriptsize]
+		% --- High bias ---
+		\begin{scope}
+			\draw[->] (0,0)--(4,0) node[right] {size};
+			\draw[->] (0,0)--(0,3);
+			\node[font=\scriptsize\bfseries] at (2,3) {High bias (Underfitting)};
+			\draw[red, thick] plot[smooth] coordinates {(0.2,2.7)(1,2.0)(2,1.75)(3.6,1.75)};
+			\node[red, right, font=\tiny] at (3.6,1.75) {val};
+			\draw[blue, thick] plot[smooth] coordinates {(0.2,0.4)(1,1.1)(2,1.4)(3.6,1.5)};
+			\node[blue, right, font=\tiny] at (3.6,1.45) {train};
+			\draw[<->, red] (3.2,1.5)--(3.2,1.75) node[midway, left, font=\tiny] {var};
+			\draw[<->, blue] (3.2,0)--(3.2,1.5) node[midway, left, font=\tiny] {bias};
+		\end{scope}
+		% --- High variance ---
+		\begin{scope}[xshift=6cm]
+			\draw[->] (0,0)--(4,0) node[right] {size};
+			\draw[->] (0,0)--(0,3);
+			\node[font=\scriptsize\bfseries] at (2,3) {High variance (Overfitting)};
+			\draw[red, thick] plot[smooth] coordinates {(0.2,2.8)(1,2.2)(2,2.0)(3.6,1.9)};
+			\node[red, right, font=\tiny] at (3.6,1.9) {val};
+			\draw[blue, thick] plot[smooth] coordinates {(0.2,0.15)(1,0.35)(2,0.45)(3.6,0.5)};
+			\node[blue, right, font=\tiny] at (3.6,0.5) {train};
+			\draw[<->, red] (3.2,0.55)--(3.2,1.85) node[midway, left, font=\tiny] {var};
+			\draw[<->, blue] (3.2,0)--(3.2,0.5) node[midway, left, font=\tiny] {bias};
+		\end{scope}
+	\end{tikzpicture}
+	\end{center}
+
+	\begin{center}
+		\begin{tabular}{p{2.4cm} p{6cm} p{6cm}}
+			\toprule
+			& \textbf{High bias} & \textbf{High variance} \\
+			\midrule
+			Attention to train data & Too little & Too much \\
+			Errors & High on \emph{both} train and test & Low train, high test \\
+			Symptom & \textbf{Underfitting} (simple model, low variance) & \textbf{Overfitting} (poor generalisation) \\
+			\bottomrule
+		\end{tabular}
+	\end{center}
 
 	\subsection{Overfitting, Generalisation \& Double Descent}
 
@@ -927,6 +1036,7 @@
 		\begin{itemize}[leftmargin=*]
 			\item \emph{Why can't a single perceptron solve XOR?} --- not linearly separable; need a hidden layer.
 			\item \emph{State / interpret the bias--variance decomposition}; which is under- vs overfitting.
+			\item \emph{Diagnose high bias vs high variance from learning curves} --- small train--val gap but high error $=$ bias; large gap $=$ variance.
 			\item \emph{Derive the L2 (weight-decay) update} and explain the shrink factor $(1-2\alpha\lambda)$.
 			\item \emph{L1 vs L2} --- L1 gives sparsity (LASSO); L2 shrinks smoothly.
 			\item \emph{How does dropout work / why does it regularise?} --- ensemble, no co-adaptation; train vs eval mode.

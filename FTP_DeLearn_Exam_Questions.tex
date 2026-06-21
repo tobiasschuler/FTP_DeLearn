@@ -859,6 +859,17 @@ Cross-entropy pushes the policy toward the given best move; MSE pushes the value
 
 \begin{enumerate}[leftmargin=*,label=\textbf{Q\arabic*.}]
 
+\q \textbf{Define supervised and unsupervised learning} and give typical applications of each.
+\begin{answerbox}
+\textbf{Supervised learning:} extract relevant features $x$ from raw observation data $o$ and \emph{learn a mapping from inputs $x$ to outputs $y$}, given a labelled training set of $(x,y)$ example pairs.
+\emph{Applications:} recognition, planning, diagnosis, prediction.
+
+\textbf{Unsupervised learning:} \emph{discover interesting structure} in the inputs $x$ given a training set -- no target outputs $y$ are provided.
+\emph{Applications:} market segmentation, social network analysis, organizing computing clusters, astronomical data analysis.
+
+\textbf{Key difference:} supervised has labels $y$ and learns $x\to y$; unsupervised has no labels and finds structure (e.g.\ clusters) in $x$ alone.
+\end{answerbox}
+
 \q \textbf{Supervised vs.\ unsupervised systems.} For each example, decide whether you would use a supervised or an unsupervised learning algorithm, and explain why.
 \begin{enumerate}[label=\textbf{(\alph*)}]
   \item Given email labeled as spam/not spam, learn a spam filter.
@@ -880,6 +891,42 @@ Yes -- \textbf{discretize} the continuous target into bins/intervals, then predi
 
 \textbf{Benefits:} handles non-linear / multi-modal targets without assuming a functional form; more robust to outliers and label noise; gives a calibrated probability per class and an easy notion of confidence; lets you use classification losses/metrics (cross-entropy, accuracy) and is often easier to optimize.
 \textbf{Cost:} you lose precision/ordering information and must choose bin boundaries; too few bins underfit, too many give sparse, hard-to-learn classes.
+\end{answerbox}
+
+\q \textbf{Explain machine learning to your grandmother.} Define machine learning as simply as possible.
+\begin{answerbox}
+Instead of writing down exact rules for a computer to follow, we \textbf{show it many examples} and let it \emph{figure out the rules by itself}. Like a child learning what a ``cat'' is by seeing lots of cats rather than reading a definition -- the machine learns patterns from experience and gets better with more examples.
+
+\textbf{Textbook version (Mitchell):} a program learns from experience $E$ w.r.t.\ task $T$ and performance measure $P$ if its performance at $T$, measured by $P$, improves with $E$.
+\end{answerbox}
+
+\q \textbf{Why do we need such systems?} Why use machine learning instead of hand-written rules?
+\begin{answerbox}
+For many problems, \textbf{explicit rules are impossible or impractical} to write by hand:
+\textbf{Complexity} -- tasks like image/speech recognition have too many cases and exceptions to enumerate.
+\textbf{Scale} -- ML automates decisions on huge data volumes that humans can't process.
+\textbf{Adaptivity} -- models adapt to new/changing data without being reprogrammed.
+\textbf{Discovery} -- they reveal patterns/correlations humans wouldn't spot.
+\textbf{Personalization} -- tailor outputs per user (recommendations, filters).
+\end{answerbox}
+
+\q \textbf{Difference between ML and DL.}
+\begin{answerbox}
+DL is a \textbf{subset} of ML using deep (many-layered) neural networks.
+\textbf{Features:} classical ML needs \emph{hand-crafted} features + a model; DL \emph{learns} features automatically (end-to-end) from raw data.
+\textbf{Data/compute:} DL needs much more data and compute (GPUs); classical ML works on smaller datasets.
+\textbf{Scaling:} DL performance keeps improving with more data, classical ML plateaus.
+\textbf{Interpretability:} classical ML is often more interpretable; DL is more of a ``black box''.
+\end{answerbox}
+
+\q \textbf{Dangers of DL.} What are the risks/limitations of deep learning?
+\begin{answerbox}
+\textbf{Black box} -- hard to interpret/explain decisions (problem in medicine, law, finance).
+\textbf{Bias} -- learns and amplifies biases present in the training data (unfair/discriminatory outputs).
+\textbf{Data hunger} -- needs large labeled datasets; expensive and may not exist.
+\textbf{Overconfidence \& brittleness} -- can be confidently wrong and fooled by \emph{adversarial examples}; fails on out-of-distribution data.
+\textbf{Cost \& environment} -- heavy compute, high energy consumption.
+\textbf{Misuse} -- deepfakes, surveillance, disinformation; over-reliance/automation without accountability.
 \end{answerbox}
 
 \end{enumerate}
@@ -972,6 +1019,56 @@ Too high: updates overshoot, loss oscillates or diverges. Too low: very slow con
 Batch: full dataset per update -- stable but slow/memory-heavy. SGD: one sample -- fast, noisy, can escape shallow minima but high variance. Mini-batch: a batch of size $B$ -- the practical compromise, uses hardware well.
 \end{answerbox}
 
+\q \textbf{Write down the algorithm of the Gradient Descent method in pseudo code.}
+\begin{answerbox}
+Goal: minimise cost function $C(\theta)$ w.r.t.\ the model parameters $\theta$.
+\begin{tabbing}
+xx\=xx\=xx\=\kill
+\textbf{1.}\> Initialise parameters $\theta^{(0)}$ (e.g.\ random); set $t \leftarrow 0$ \\[2pt]
+\textbf{2.}\> \textbf{repeat} (update step $t \to t+1$): \\
+\> \textbf{(i)} compute gradient at current position: $g \leftarrow \nabla C(\theta^{(t)})$ \\
+\> \textbf{(ii)} step in negative-gradient direction: $\theta^{(t+1)} \leftarrow \theta^{(t)} - \alpha\, \nabla C(\theta^{(t)})$ \\
+\> \>\quad $t \leftarrow t+1$ \\[2pt]
+\textbf{3.}\> \textbf{until} the change in $\theta$ is very small ($\lVert \theta^{(t+1)}-\theta^{(t)} \rVert < \varepsilon$)
+\end{tabbing}
+\textbf{Notation:} $\alpha$ -- learning rate (step size); $\nabla C(\theta^{(t)})$ -- gradient of the cost at the last position reached.
+\textbf{Key fact:} $\theta^{(t)}$ and $\nabla C(\theta^{(t)})$ have the \emph{same dimensionality}, so the update is element-wise per parameter.
+\end{answerbox}
+
+\q \textbf{Short conceptual questions on optimisation and generalisation.}
+
+\textbf{(a) In what sense are optimisation techniques important for ML?}
+\begin{answerbox}
+Training a model \emph{is} an optimisation problem: we minimise a cost $J(\theta)$ over the parameters $\theta$. Without efficient optimisation (gradient descent and its variants) we could not fit models with millions of parameters. The chosen optimiser determines whether training converges, how fast, and to how good a solution -- so optimisation directly controls feasibility, training time, and final accuracy.
+\end{answerbox}
+
+\textbf{(b) Which problems can gradient descent be applied to? When is the solution unique? What can go wrong in general?}
+\begin{answerbox}
+\textbf{Applicable to:} any problem with a \emph{differentiable} cost where we can compute (or estimate) the gradient $\nabla C(\theta)$.
+\textbf{Unique solution:} when the cost is \emph{convex} (e.g.\ a single global minimum, as in linear regression / MSE or logistic regression) -- GD converges to the global optimum regardless of initialisation (with a suitable learning rate).
+\textbf{General (non-convex, e.g.\ deep nets):} the surface has many local minima, saddle points, and flat/plateau regions, so GD may get stuck in a poor local minimum or saddle, converge slowly, and the result \emph{depends on initialisation}. It also requires differentiability and a well-chosen learning rate.
+\end{answerbox}
+
+\textbf{(c) Why is MSE cost less suitable for classification?}
+\begin{answerbox}
+With sigmoid/softmax outputs, MSE gives a \textbf{non-convex} loss and \emph{small/vanishing gradients} when the output is confidently wrong (the sigmoid saturates), so learning stalls. Cross-entropy is convex in the logits and yields a clean gradient $\hat y - y$ that is large exactly when the prediction is badly wrong -- faster, more reliable learning. MSE also assumes Gaussian errors, which does not match discrete class labels.
+\end{answerbox}
+
+\textbf{(d) What may happen if the learning rate is too large?}
+\begin{answerbox}
+The updates overshoot the minimum; the loss \textbf{oscillates, fails to converge, or diverges} (blows up to NaN/$\infty$). Effectively you jump back and forth across (or out of) the valley instead of descending into it.
+\end{answerbox}
+
+\textbf{(e) Why can the test error start increasing after some epochs?}
+\begin{answerbox}
+\textbf{Overfitting.} After a point the model stops learning general patterns and starts memorising noise/idiosyncrasies of the training set: training error keeps falling while test (generalisation) error rises. This is the classic U-shaped test-error curve and motivates \emph{early stopping}.
+\end{answerbox}
+
+\textbf{(f) With more training data, does reaching a small \emph{training} cost get easier or harder?}
+\begin{answerbox}
+\textbf{Harder.} More (and more varied) examples are more difficult to fit \emph{all} at once, so the achievable training cost is typically higher and the train/test gap shrinks. Memorising a tiny dataset is easy (low training cost, poor generalisation); fitting a large one forces the model to learn genuine structure -- worse training cost but better generalisation.
+\end{answerbox}
+
 \end{enumerate}
 
 % ==================================================
@@ -1005,6 +1102,59 @@ L2 (weight decay) shrinks all weights smoothly toward zero. L1 pushes many weigh
 High bias (too simple) underfits; high variance (too flexible) overfits. Total error balances the two; we choose model capacity / regularization to minimize their sum.
 \end{answerbox}
 
+\q \textbf{Bias/variance, split ratio, double descent, and regularisation.}
+
+\textbf{(a) Explain bias error and variance error. What makes each larger/smaller?}
+\begin{answerbox}
+\textbf{Bias error:} error from wrong/too-simple assumptions -- the model cannot capture the true relationship (\emph{underfitting}). Large when the model is too simple (too few parameters/layers, too much regularisation, wrong features). Reduced by increasing capacity, adding features, training longer, less regularisation.
+
+\textbf{Variance error:} error from sensitivity to the particular training set -- the model fits noise and changes a lot with different data (\emph{overfitting}). Large when the model is too complex relative to the data, or the dataset is small. Reduced by more training data, regularisation (L1/L2, dropout), data augmentation, a simpler model, or ensembling/early stopping.
+\end{answerbox}
+
+\textbf{(b) Why does training error increase, and validation error decrease, with the split ratio (fraction used for training)?}
+\begin{answerbox}
+\textbf{Training error $\uparrow$:} with a larger split ratio there are \emph{more} training samples to fit simultaneously, which is harder -- a small set is easy to memorise (low train error), a large diverse set forces compromises (higher train error).
+
+\textbf{Validation error $\downarrow$:} more training data lets the model learn the true underlying structure and generalise better, so it performs better on the held-out validation set. (At the same time the validation set shrinks, but the dominant effect is better generalisation from more training data.)
+\end{answerbox}
+
+\textbf{(c) What is the "deep double descent" phenomenon?}
+\begin{answerbox}
+As model size (or training time/data) grows, test error first follows the classical U-curve -- decreasing, then \emph{increasing} as we approach the \textbf{interpolation threshold} (just enough capacity to fit the training data exactly). Beyond that point, in the \emph{over-parameterised} regime, the test error \textbf{decreases again} -- a second descent. So very large models can generalise well despite fitting the training data perfectly, contradicting the classical bias--variance picture.
+\end{answerbox}
+
+\textbf{(d) What is the goal of regularisation in deep learning?}
+\begin{answerbox}
+To \textbf{reduce overfitting / variance and improve generalisation} to unseen data -- by constraining the model's effective capacity or adding prior information (e.g.\ a preference for small/simple weights), so it learns robust patterns instead of memorising training noise. It trades a little more bias for much less variance.
+\end{answerbox}
+
+\textbf{(e) List four regularisation methods and describe each in two sentences.}
+\begin{answerbox}
+\textbf{L2 (weight decay):} adds $\lambda\lVert\theta\rVert_2^2$ to the loss, penalising large weights. This shrinks all weights smoothly toward zero, giving a smoother, less complex function.
+
+\textbf{L1:} adds $\lambda\lVert\theta\rVert_1$ to the loss. It drives many weights to exactly zero, producing sparse models and implicit feature selection.
+
+\textbf{Dropout:} randomly zeros a fraction $p$ of activations each training step. This prevents co-adaptation of neurons and acts like training an ensemble of sub-networks, improving robustness.
+
+\textbf{Early stopping:} monitor validation error during training and stop when it starts rising. This halts before the model overfits the training data, effectively limiting capacity. (Alternatives: \emph{data augmentation} -- enlarge/vary the dataset with label-preserving transforms; \emph{batch normalisation} -- adds noise/scaling that regularises.)
+\end{answerbox}
+
+\q \textbf{Reading a learning curve (activity).} An image classifier (MobileNetV2) is trained for 30 epochs. \emph{Training} accuracy rises steadily from $\sim$0.75 to $\sim$0.88, while \emph{validation} accuracy rises to $\sim$0.82 around epoch 15--20 and then \textbf{plateaus and slightly declines} (to $\sim$0.79). The gap between the two curves keeps widening.
+\begin{enumerate}[label=\textbf{(\alph*)}]
+  \item What can we say about this evolution of accuracy along the epochs?
+  \item What can we do with an ``improvement budget'' (engineering time) of: 0h more, 15h more, 150h more?
+\end{enumerate}
+\begin{answerbox}
+\textbf{(a) Diagnosis -- overfitting.} Training accuracy keeps improving while validation accuracy stalls (\textasciitilde epoch 15--20) and then drops, so the train/val gap widens: the model is fitting training-set noise and generalising worse. The best generalising model is \emph{not} the last epoch but the one at peak validation accuracy.
+
+\textbf{(b) What to do per budget:}
+\textbf{0h more (free, no training):} use \emph{early stopping} -- pick the checkpoint at peak validation accuracy ($\sim$epoch 15--20) instead of the final model. No extra work, immediate gain.
+
+\textbf{15h more (light effort):} add \emph{regularisation / data augmentation} and re-tune -- dropout, weight decay, image augmentation (flips, crops, colour jitter), tune the learning rate / LR schedule. Cheap changes that directly attack the overfitting.
+
+\textbf{150h more (large effort):} attack the data and architecture -- \emph{collect/label more data}, try a larger or different backbone, transfer learning / fine-tuning, hyper-parameter search, ensembling. Highest potential gain but expensive.
+\end{answerbox}
+
 \end{enumerate}
 
 \begin{examtipbox}
@@ -1035,6 +1185,60 @@ A filter detects the same pattern anywhere in the image (translation equivarianc
 \q What is the difference between max pooling and average pooling, and why pool at all?
 \begin{answerbox}
 Max pooling keeps the strongest activation in a region (more invariance, keeps salient features); average pooling smooths. Both downsample to reduce spatial size and computation, with no learnable parameters.
+\end{answerbox}
+
+\q \textbf{CNN fundamentals.}
+
+\textbf{(a) What does it mean to ``preserve the spatial structure'' in a CNN?}
+\begin{answerbox}
+The input keeps its 2D (or 3D) grid layout throughout the conv/pool layers instead of being flattened into a 1D vector (as an MLP would). Neighbouring pixels stay neighbours, so the network can exploit \emph{local spatial relationships} (edges, textures, shapes) and translation structure -- which would be destroyed by flattening.
+\end{answerbox}
+
+\textbf{(b) Explain the operations performed when convolving a filter over an input.}
+\begin{answerbox}
+The filter (small weight kernel) \emph{slides} over the input. At each position it performs an \textbf{element-wise multiplication} of the filter weights with the overlapping input patch, then \textbf{sums} the products (a dot product), and adds a \textbf{bias} -- giving one scalar in the output. Sliding over all positions (controlled by stride/padding) produces the 2D \emph{activation map}; an activation function (e.g.\ ReLU) is then applied element-wise.
+\end{answerbox}
+
+\textbf{(c) Shape of the parameter tensor of one filter in a Conv3D layer? Tunable hyper-parameters?}
+\begin{answerbox}
+One Conv3D filter spans all input channels, so its weight tensor has shape $(C_{in}, D, H, W)$ -- depth $\times$ height $\times$ width $\times$ input channels -- plus \textbf{1 bias} scalar. (E.g.\ a $3\times3\times3$ filter over $C_{in}$ channels $= 27\,C_{in}+1$ params.)
+\textbf{Tunable hyper-parameters:} kernel size, number of filters (= output channels), stride, padding, dilation. (The weight \emph{values} are learned, not tuned.)
+\end{answerbox}
+
+\textbf{(d) Define receptive field and activation map.}
+\begin{answerbox}
+\textbf{Receptive field:} the region of the input that influences (is ``seen by'') a particular output neuron. It grows with depth as layers stack.
+\textbf{Activation map (feature map):} the 2D output produced by applying one filter across the whole input -- it shows where that filter's pattern is detected.
+\end{answerbox}
+
+\textbf{(e) Explain sparse connectivity and parameter sharing.}
+\begin{answerbox}
+\textbf{Sparse connectivity (local connectivity):} each output neuron connects only to a small local patch of the input (the kernel region), not to every input -- far fewer connections than a fully-connected layer.
+\textbf{Parameter sharing:} the \emph{same} filter weights are reused at every spatial location. This gives translation equivariance and drastically reduces the number of parameters.
+\end{answerbox}
+
+\textbf{(f) Effect of stride and zero-padding.}
+\begin{answerbox}
+\textbf{Stride $s$:} step size of the filter. Larger stride $\Rightarrow$ filter skips positions $\Rightarrow$ \emph{smaller} output (downsampling), less computation.
+\textbf{Zero-padding $p$:} adds zeros around the border. It lets the filter cover edge pixels and \emph{controls output size} -- ``same'' padding keeps output size equal to input; without padding the output shrinks each layer.
+Output size: $O = \left\lfloor \dfrac{I - K + 2p}{s} \right\rfloor + 1$.
+\end{answerbox}
+
+\textbf{(g) Compute the number of parameters of a convolution layer.}
+\begin{answerbox}
+For a 2D conv layer with kernel $K\times K$, $C_{in}$ input channels, $C_{out}$ filters (with bias):
+\[ \#\text{params} = (K \cdot K \cdot C_{in} + 1)\cdot C_{out}. \]
+The ``$+1$'' is the per-filter bias. \emph{Example:} $5\times5$, $C_{in}=3$, $C_{out}=10$ $\Rightarrow (5\cdot5\cdot3+1)\cdot10 = 760$. Note this is independent of the input spatial size (parameter sharing).
+\end{answerbox}
+
+\textbf{(h) What is a max pooling layer and its role?}
+\begin{answerbox}
+A layer that slides a window over each activation map and outputs the \textbf{maximum} value in each window. It \emph{downsamples} (reduces spatial size and computation), keeps the strongest/most salient activations, and adds a degree of \emph{translation invariance}. It has \textbf{no learnable parameters}.
+\end{answerbox}
+
+\textbf{(i) Can simple CNN architectures (as in this PW) address object detection or segmentation?}
+\begin{answerbox}
+\textbf{No -- not directly.} A plain CNN classifier outputs a single label for the whole image; it does not localise objects (detection $=$ class $+$ bounding box) or label every pixel (segmentation). These tasks need specialised architectures: detection $\to$ R-CNN/YOLO/SSD; segmentation $\to$ FCN/U-Net/Mask R-CNN, which build on CNN backbones but add localisation/up-sampling heads.
 \end{answerbox}
 
 \end{enumerate}
